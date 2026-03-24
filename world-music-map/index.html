@@ -97,8 +97,8 @@ body { background: #0a0a1a; color: #fff; font-family: -apple-system, 'PingFang S
   <div class="tags" id="panel-tags"></div>
 </div>
 
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://unpkg.com/globe.gl@2.31.0/dist/globe.gl.min.js"></script>
+<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.27.2/dist/globe.gl.min.js"></script>
 <script>
 const musicData = [
   { country: "中国", flag: "🇨🇳", lat: 35.86, lng: 104.19, genre: "古筝 · Guzheng", color: "#ff6a00",
@@ -175,9 +175,9 @@ const musicData = [
 // Init globe
 const globe = Globe()
   (document.getElementById('globe-container'))
-  .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-  .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-  .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+  .globeImageUrl('https://unpkg.com/three-globe@2.27.2/example/img/earth-blue-marble.jpg')
+  .bumpImageUrl('https://unpkg.com/three-globe@2.27.2/example/img/earth-topology.png')
+  .backgroundImageUrl('https://unpkg.com/three-globe@2.27.2/example/img/night-sky.png')
   .atmosphereColor('#3b82f6')
   .atmosphereAltitude(0.25)
   .pointsData(musicData)
