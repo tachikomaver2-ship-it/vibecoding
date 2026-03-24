@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌍 World Music Map - 世界音乐地图</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; color: #fff; font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif; overflow: hidden; }
+
+#globe-container { width: 100vw; height: 100vh; position: relative; }
+
+#info-panel {
+  position: fixed; right: -420px; top: 0; width: 400px; height: 100vh;
+  background: linear-gradient(180deg, rgba(15,15,40,0.97) 0%, rgba(10,10,30,0.99) 100%);
+  backdrop-filter: blur(20px); border-left: 1px solid rgba(100,140,255,0.15);
+  transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 100; overflow-y: auto; padding: 30px;
+}
+#info-panel.open { right: 0; }
+#info-panel .close-btn {
+  position: absolute; top: 15px; right: 15px; width: 36px; height: 36px;
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; background: none;
+  color: #fff; font-size: 18px; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; transition: all 0.2s;
+}
+#info-panel .close-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.4); }
+#info-panel .country-flag { font-size: 48px; margin-bottom: 10px; }
+#info-panel .country-name { font-size: 28px; font-weight: 700; margin-bottom: 5px; }
+#info-panel .music-genre { font-size: 16px; color: #ff6a00; font-weight: 600; margin-bottom: 20px; }
+#info-panel .description { font-size: 14px; line-height: 1.8; color: rgba(255,255,255,0.8); margin-bottom: 25px; }
+#info-panel .video-container { width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; margin-bottom: 20px; background: #000; }
+#info-panel .video-container iframe { width: 100%; height: 100%; border: none; }
+#info-panel .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+#info-panel .tag {
+  padding: 4px 12px; border-radius: 20px; font-size: 12px;
+  background: rgba(255,106,0,0.15); color: #ff6a00; border: 1px solid rgba(255,106,0,0.3);
+}
+
+#title-overlay {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  text-align: center; z-index: 50; pointer-events: none;
+}
+#title-overlay h1 { font-size: 24px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+#title-overlay p { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 5px; }
+
+#hint {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; color: rgba(255,255,255,0.4); z-index: 50; pointer-events: none;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+
+#legend {
+  position: fixed; bottom: 30px; left: 20px; z-index: 50;
+  background: rgba(15,15,40,0.8); backdrop-filter: blur(10px);
+  border: 1px solid rgba(100,140,255,0.15); border-radius: 12px;
+  padding: 15px; font-size: 12px;
+}
+#legend .item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+#legend .item:last-child { margin-bottom: 0; }
+#legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+@media (max-width: 768px) {
+  #info-panel { width: 100%; right: -100%; }
+  #legend { display: none; }
+  #title-overlay h1 { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div id="title-overlay">
+  <h1>🌍 World Music Map</h1>
+  <p>点击光点探索世界各地的音乐文化</p>
+</div>
+
+<div id="hint">🖱️ 拖动旋转 · 滚轮缩放 · 点击光点探索</div>
+
+<div id="legend">
+  <div class="item"><div class="dot" style="background:#ff6a00"></div> 亚洲</div>
+  <div class="item"><div class="dot" style="background:#3b82f6"></div> 欧洲</div>
+  <div class="item"><div class="dot" style="background:#10b981"></div> 非洲</div>
+  <div class="item"><div class="dot" style="background:#f59e0b"></div> 美洲</div>
+  <div class="item"><div class="dot" style="background:#ec4899"></div> 大洋洲</div>
+</div>
+
+<div id="globe-container"></div>
+
+<div id="info-panel">
+  <button class="close-btn" onclick="closePanel()">✕</button>
+  <div class="country-flag" id="panel-flag"></div>
+  <div class="country-name" id="panel-name"></div>
+  <div class="music-genre" id="panel-genre"></div>
+  <div class="description" id="panel-desc"></div>
+  <div class="video-container"><iframe id="panel-video" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>
+  <div class="tags" id="panel-tags"></div>
+</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.31.0/dist/globe.gl.min.js"></script>
+<script>
+const musicData = [
+  { country: "中国", flag: "🇨🇳", lat: 35.86, lng: 104.19, genre: "古筝 · Guzheng", color: "#ff6a00",
+    desc: "古筝是中国最古老的弹拨乐器之一，有两千多年历史。它音色优美、表现力丰富，被誉为"众乐之王"。代表曲目《高山流水》《渔舟唱晚》等，展现了中国音乐追求意境与自然和谐的美学理想。",
+    video: "https://www.youtube.com/embed/jIFK0NXsGng", tags: ["古典", "弹拨", "传统"] },
+  { country: "日本", flag: "🇯🇵", lat: 36.20, lng: 138.25, genre: "太鼓 · Taiko", color: "#ff6a00",
+    desc: "太鼓是日本传统打击乐器，源于古代祭祀仪式。演奏太鼓需要全身的力量和精准的节奏感，是力量与艺术的完美结合。现代太鼓表演融合了传统与创新，在世界舞台上极具感染力。",
+    video: "https://www.youtube.com/embed/C7HL5wYqAbU", tags: ["打击乐", "祭祀", "力量"] },
+  { country: "印度", flag: "🇮🇳", lat: 20.59, lng: 78.96, genre: "西塔琴 · Sitar", color: "#ff6a00",
+    desc: "西塔琴是印度古典音乐的灵魂乐器，有着独特的共鸣弦设计，能产生迷人的嗡鸣音效。大师拉维·香卡将西塔琴带上世界舞台，影响了披头士乐队等西方音乐人。",
+    video: "https://www.youtube.com/embed/yF4LFCWJhDg", tags: ["古典", "冥想", "拉格"] },
+  { country: "韩国", flag: "🇰🇷", lat: 35.91, lng: 127.77, genre: "伽倻琴 · Gayageum", color: "#ff6a00",
+    desc: "伽倻琴是韩国代表性传统弦乐器，有12根弦，音色清雅动人。它既能演奏宫廷雅乐，也能表现民间散调，是韩国音乐文化的象征。现代伽倻琴演奏融入了爵士和流行元素。",
+    video: "https://www.youtube.com/embed/bOYKfJBpbjA", tags: ["弦乐", "宫廷", "传统"] },
+  { country: "印度尼西亚", flag: "🇮🇩", lat: -0.79, lng: 113.92, genre: "甘美兰 · Gamelan", color: "#ff6a00",
+    desc: "甘美兰是印尼传统合奏音乐，由青铜打击乐器、竹笛和弓弦乐器组成。它的层叠音响和循环节奏营造出冥想般的氛围，被联合国教科文组织列为人类非物质文化遗产。",
+    video: "https://www.youtube.com/embed/sZZTfu4jWcI", tags: ["合奏", "打击乐", "冥想"] },
+  { country: "泰国", flag: "🇹🇭", lat: 15.87, lng: 100.99, genre: "古典音乐 · Piphat", color: "#ff6a00",
+    desc: "泰国古典音乐以木琴(Ranat)为核心，配合双簧管和打击乐器，常用于宫廷仪式和传统戏剧。其五声音阶体系独特，旋律优雅精致，体现了泰国文化的细腻与庄重。",
+    video: "https://www.youtube.com/embed/YUhROAfulOQ", tags: ["宫廷", "木琴", "仪式"] },
+  { country: "蒙古", flag: "🇲🇳", lat: 46.86, lng: 103.85, genre: "呼麦 · Throat Singing", color: "#ff6a00",
+    desc: "呼麦是蒙古族独特的歌唱艺术，一个人能同时发出两个甚至多个声部。这种超自然的歌声模仿大自然的风声、水声和马蹄声，是游牧民族与草原对话的方式。",
+    video: "https://www.youtube.com/embed/1rmo3fKeveo", tags: ["泛音", "草原", "世遗"] },
+  { country: "土耳其", flag: "🇹🇷", lat: 38.96, lng: 35.24, genre: "苏菲音乐 · Sufi", color: "#3b82f6",
+    desc: "苏菲音乐是伊斯兰教神秘主义的音乐表达，以旋转舞和芦笛(Ney)闻名。鲁米的诗歌配合旋转修行者的舞蹈，创造出超越语言的精神体验，引领听众进入冥想状态。",
+    video: "https://www.youtube.com/embed/G9O7-GUsztI", tags: ["冥想", "芦笛", "旋转舞"] },
+  { country: "西班牙", flag: "🇪🇸", lat: 40.46, lng: -3.75, genre: "弗拉门戈 · Flamenco", color: "#3b82f6",
+    desc: "弗拉门戈融合了吉普赛、摩尔和安达卢西亚文化，以激烈的吉他、深沉的歌声和充满张力的舞蹈著称。它表达了人类最深处的情感——爱、痛苦、自由与反抗。",
+    video: "https://www.youtube.com/embed/7UVHpMcCDeo", tags: ["舞蹈", "吉他", "激情"] },
+  { country: "爱尔兰", flag: "🇮🇪", lat: 53.14, lng: -7.69, genre: "凯尔特民谣 · Celtic Folk", color: "#3b82f6",
+    desc: "爱尔兰音乐以小提琴、锡哨和尤里安风笛为特色，旋律时而欢快跳跃，时而深沉忧伤。它是酒馆里的欢聚，也是漂泊者的乡愁，深深影响了美国乡村音乐的发展。",
+    video: "https://www.youtube.com/embed/b1fblOonoIo", tags: ["民谣", "风笛", "酒馆"] },
+  { country: "法国", flag: "🇫🇷", lat: 46.23, lng: 2.21, genre: "香颂 · Chanson", color: "#3b82f6",
+    desc: "法国香颂是一种讲究歌词文学性的演唱艺术，从伊迪丝·琵雅芙到现代的ZAZ，香颂用诗意的法语诉说爱情、巴黎和人生。手风琴的旋律是其标志性的声音。",
+    video: "https://www.youtube.com/embed/Q3Kvu6Kgp88", tags: ["诗歌", "手风琴", "浪漫"] },
+  { country: "俄罗斯", flag: "🇷🇺", lat: 61.52, lng: 105.32, genre: "巴拉莱卡 · Balalaika", color: "#3b82f6",
+    desc: "巴拉莱卡是俄罗斯的三角琴，三根弦却能演奏出丰富的旋律。从欢快的民间舞曲到深沉的俄罗斯灵魂之歌，它是白桦林和伏特加旁最温暖的陪伴。",
+    video: "https://www.youtube.com/embed/aoExFyCVGnE", tags: ["弦乐", "民间", "三角琴"] },
+  { country: "苏格兰", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", lat: 56.49, lng: -4.20, genre: "风笛 · Bagpipes", color: "#3b82f6",
+    desc: "苏格兰高地风笛的声音雄壮激昂，能在山谷间回荡数英里。它既是战场上的号角，也是婚礼和葬礼上的庄严伴奏。风笛手穿着格子呢裙演奏的形象已成为苏格兰的文化符号。",
+    video: "https://www.youtube.com/embed/PSH0eRKq1lE", tags: ["风笛", "高地", "仪式"] },
+  { country: "埃及", flag: "🇪🇬", lat: 26.82, lng: 30.80, genre: "乌德琴 · Oud", color: "#10b981",
+    desc: "乌德琴被誉为"乐器之王"，是阿拉伯音乐的核心。它的无品设计允许演奏微分音，创造出西方音阶无法表达的情感层次。从古埃及到现代开罗的咖啡馆，乌德琴的声音跨越千年。",
+    video: "https://www.youtube.com/embed/DfGCLOdvAPc", tags: ["阿拉伯", "弹拨", "古典"] },
+  { country: "尼日利亚", flag: "🇳🇬", lat: 9.08, lng: 7.49, genre: "非洲节奏 · Afrobeats", color: "#10b981",
+    desc: "Afrobeats融合了传统非洲节奏、放克和嘻哈，以Burna Boy、Wizkid等艺人引领全球潮流。强烈的节奏感和欢快的旋律让人无法不跟着摇摆，正在重新定义世界流行音乐。",
+    video: "https://www.youtube.com/embed/2vUsBFmmkPs", tags: ["节奏", "流行", "舞蹈"] },
+  { country: "巴西", flag: "🇧🇷", lat: -14.24, lng: -51.93, genre: "桑巴 · Samba", color: "#f59e0b",
+    desc: "桑巴是巴西的灵魂，融合了非洲鼓乐、葡萄牙旋律和原住民元素。里约狂欢节上，数万人随着桑巴的节奏起舞，这是世界上最盛大的音乐庆典。",
+    video: "https://www.youtube.com/embed/CxWLGGGhgiY", tags: ["狂欢节", "舞蹈", "节奏"] },
+  { country: "古巴", flag: "🇨🇺", lat: 21.52, lng: -77.78, genre: "萨尔萨 · Salsa", color: "#f59e0b",
+    desc: "萨尔萨音乐诞生于古巴，融合了非洲节奏和西班牙旋律。铜管乐器的热烈吹奏、康加鼓的律动和性感的舞步，让萨尔萨成为拉丁美洲最具感染力的音乐风格。",
+    video: "https://www.youtube.com/embed/lMo3HA-AC1Y", tags: ["拉丁", "舞蹈", "铜管"] },
+  { country: "牙买加", flag: "🇯🇲", lat: 18.11, lng: -77.30, genre: "雷鬼 · Reggae", color: "#f59e0b",
+    desc: "Bob Marley让雷鬼音乐走向世界。独特的离拍节奏、贝斯驱动的律动和充满社会意识的歌词，使雷鬼不仅是音乐，更是一种追求和平与正义的精神运动。",
+    video: "https://www.youtube.com/embed/SbxMUoCHDOs", tags: ["和平", "节奏", "社会"] },
+  { country: "美国", flag: "🇺🇸", lat: 37.09, lng: -95.71, genre: "爵士 · Jazz", color: "#f59e0b",
+    desc: "爵士乐诞生于新奥尔良，是非裔美国人送给世界的礼物。即兴演奏是爵士的灵魂——每一次演出都是独一无二的创作。从布鲁斯到自由爵士，它不断突破音乐的边界。",
+    video: "https://www.youtube.com/embed/NbOdBvJPmWw", tags: ["即兴", "布鲁斯", "自由"] },
+  { country: "墨西哥", flag: "🇲🇽", lat: 23.63, lng: -102.55, genre: "马里亚奇 · Mariachi", color: "#f59e0b",
+    desc: "马里亚奇乐队身穿华丽的Charro服装，用小号、吉他和小提琴演奏热情洋溢的墨西哥民歌。无论是婚礼、生日还是街头，马里亚奇的歌声都能点燃拉丁人的灵魂。",
+    video: "https://www.youtube.com/embed/GJM90qqMPSE", tags: ["小号", "民歌", "庆典"] },
+  { country: "阿根廷", flag: "🇦🇷", lat: -38.42, lng: -63.62, genre: "探戈 · Tango", color: "#f59e0b",
+    desc: "探戈诞生于布宜诺斯艾利斯的街头，是孤独与激情的对话。班多钮手风琴的哀怨音色配合紧密相拥的舞步，诉说着移民者的乡愁和都市人的渴望。",
+    video: "https://www.youtube.com/embed/Ek_XKLY1jJQ", tags: ["舞蹈", "手风琴", "激情"] },
+  { country: "秘鲁", flag: "🇵🇪", lat: -9.19, lng: -75.02, genre: "安第斯音乐 · Andean", color: "#f59e0b",
+    desc: "安第斯音乐以排箫(Zampoña)和恰朗戈小吉他为特色，旋律悠远空灵，仿佛来自高山之巅的风声。《山鹰之歌》(El Cóndor Pasa)是最广为人知的安第斯旋律。",
+    video: "https://www.youtube.com/embed/g3ENX3aHlqU", tags: ["排箫", "高原", "自然"] },
+  { country: "澳大利亚", flag: "🇦🇺", lat: -25.27, lng: 133.78, genre: "迪吉里杜管 · Didgeridoo", color: "#ec4899",
+    desc: "迪吉里杜管是世界上最古老的乐器之一，由澳大利亚原住民发明，有上万年历史。它发出的深沉嗡鸣声被认为能连接大地的灵魂，是"梦幻时代"创世故事的声音载体。",
+    video: "https://www.youtube.com/embed/D4Hx9InBBRE", tags: ["原住民", "嗡鸣", "古老"] },
+];
+
+// Init globe
+const globe = Globe()
+  (document.getElementById('globe-container'))
+  .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+  .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+  .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
+  .atmosphereColor('#3b82f6')
+  .atmosphereAltitude(0.25)
+  .pointsData(musicData)
+  .pointLat('lat')
+  .pointLng('lng')
+  .pointColor('color')
+  .pointAltitude(0.06)
+  .pointRadius(0.5)
+  .pointsMerge(false)
+  .onPointClick(d => showPanel(d))
+  .labelsData(musicData)
+  .labelLat('lat')
+  .labelLng('lng')
+  .labelText('country')
+  .labelSize(1.2)
+  .labelDotRadius(0.4)
+  .labelColor(() => 'rgba(255,255,255,0.75)')
+  .labelResolution(2)
+  .labelAltitude(0.07);
+
+// Auto-rotate
+globe.controls().autoRotate = true;
+globe.controls().autoRotateSpeed = 0.5;
+globe.controls().enableDamping = true;
+
+// Glow ring animation
+let time = 0;
+function animate() {
+  time += 0.02;
+  globe.pointAltitude(d => 0.04 + Math.sin(time + d.lat * 0.1) * 0.02);
+  requestAnimationFrame(animate);
+}
+animate();
+
+// Panel
+function showPanel(d) {
+  globe.controls().autoRotate = false;
+  globe.pointOfView({ lat: d.lat, lng: d.lng, altitude: 1.5 }, 800);
+
+  document.getElementById('panel-flag').textContent = d.flag;
+  document.getElementById('panel-name').textContent = d.country;
+  document.getElementById('panel-genre').textContent = '🎵 ' + d.genre;
+  document.getElementById('panel-desc').textContent = d.desc;
+  document.getElementById('panel-video').src = d.video + '?rel=0';
+  document.getElementById('panel-tags').innerHTML = d.tags.map(t => `<span class="tag">${t}</span>`).join('');
+  document.getElementById('info-panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('info-panel').classList.remove('open');
+  document.getElementById('panel-video').src = '';
+  globe.controls().autoRotate = true;
+}
+
+// Responsive
+window.addEventListener('resize', () => globe.width(window.innerWidth).height(window.innerHeight));
+
+// Keyboard
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+</script>
+</body>
+</html>
