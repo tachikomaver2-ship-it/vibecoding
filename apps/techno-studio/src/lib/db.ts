@@ -1,28 +1,45 @@
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import type { Comment, CompositionState, Post } from "./types";
 import { createInitialState } from "./prompt-parser";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const POSTS_FILE = path.join(DATA_DIR, "posts.json");
+function getDataDir() {
+  // Vercel / serverless: only /tmp is writable
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join(os.tmpdir(), "techno-studio-data");
+  }
+  return path.join(process.cwd(), "data");
+}
+
+function getPostsFile() {
+  return path.join(getDataDir(), "posts.json");
+}
 
 async function ensureDataDir() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(getDataDir(), { recursive: true });
 }
 
 async function readPosts(): Promise<Post[]> {
   await ensureDataDir();
+  const postsFile = getPostsFile();
   try {
-    const raw = await fs.readFile(POSTS_FILE, "utf-8");
+    const raw = await fs.readFile(postsFile, "utf-8");
     return JSON.parse(raw) as Post[];
   } catch {
-    return getSeedPosts();
+    const seed = getSeedPosts();
+    try {
+      await fs.writeFile(postsFile, JSON.stringify(seed, null, 2));
+    } catch {
+      // read-only env fallback
+    }
+    return seed;
   }
 }
 
 async function writePosts(posts: Post[]) {
   await ensureDataDir();
-  await fs.writeFile(POSTS_FILE, JSON.stringify(posts, null, 2));
+  await fs.writeFile(getPostsFile(), JSON.stringify(posts, null, 2));
 }
 
 function getSeedPosts(): Post[] {

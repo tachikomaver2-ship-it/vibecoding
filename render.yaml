@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: techno-studio-dev
+    runtime: node
+    region: singapore
+    plan: free
+    branch: techno
+    rootDir: apps/techno-studio
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
