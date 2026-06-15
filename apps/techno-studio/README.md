@@ -41,6 +41,40 @@ npm run dev
 
 打开 http://localhost:3000
 
+## 部署（Dev / 外网访问）
+
+### 方式一：Vercel（推荐，永久 HTTPS 地址）
+
+1. 打开一键导入：  
+   https://vercel.com/new/import?repository-url=https%3A%2F%2Fgithub.com%2Ftachikomaver2-ship-it%2Fvibecoding&project-name=techno-studio-dev&root-directory=apps%2Ftechno-studio&branch=techno
+
+2. 登录 Vercel → 选择 GitHub 仓库 `vibecoding` → 分支 `techno`  
+3. Root Directory 设为 `apps/techno-studio` → Deploy  
+4. 完成后获得 `https://techno-studio-dev.vercel.app` 类似的外网地址
+
+CLI 部署（需先 `npx vercel login`）：
+
+```bash
+cd apps/techno-studio
+npx vercel          # preview / dev
+npx vercel --prod   # 生产
+```
+
+### 方式二：Render（持久化磁盘，适合帖子数据）
+
+1. 打开 https://dashboard.render.com/select-repo?type=blueprint  
+2. 连接 GitHub 仓库，选择 `techno` 分支  
+3. Render 会自动读取根目录 `render.yaml` 并部署 `techno-studio-dev`
+
+### 方式三：本地隧道（临时 dev 预览）
+
+```bash
+npm run build && npm start
+npx localtunnel --port 3000
+```
+
+首次访问 loca.lt 链接时，页面会要求输入本机公网 IP（或点击 Remind me later）。
+
 ## 目录结构
 
 ```
