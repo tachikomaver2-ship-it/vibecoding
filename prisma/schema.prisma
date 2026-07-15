@@ -1,0 +1,634 @@
+// Agent Eval — Prisma Schema
+// Normalized from 197-field evaluation wide table
+// References: SRE-Agent-度量指标体系.pdf, SRE-Agent-评测宽表.xlsx
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── 1. 用户/租户 (fields 1-4) ────────────────────────
+model Tenant {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique @db.VarChar(64)
+  userId    String   @db.VarChar(64)
+  orgName   String?  @db.VarChar(128)
+  planType  PlanType @default(free)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentConfigs  AgentConfig[]
+  taskInstances TaskInstance[]
+  healingEvents HealingEvent[]
+}
+
+enum PlanType {
+  free
+  pro
+  enterprise
+}
+
+// ─── 2. Agent (fields 5-8) ────────────────────────────
+model AgentConfig {
+  id                  String   @id @default(cuid())
+  agentId             String   @db.VarChar(64)
+  agentVersion        String   @db.VarChar(32)
+  agentConfigSnapshot Json?
+  agentModel          String?  @db.VarChar(64)
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+
+  taskInstances TaskInstance[]
+  healingEvents HealingEvent[]
+
+  @@index([agentId])
+}
+
+// ─── 3. 任务 (fields 9-14) ────────────────────────────
+model TaskInstance {
+  id              String         @id @default(cuid())
+  taskId          String         @db.VarChar(64)
+  taskInstanceId  String         @unique @db.VarChar(64)
+  taskType        TaskType       @default(general)
+  taskDescription String?        @db.Text
+  taskComplexity  TaskComplexity @default(medium)
+  taskStatus      TaskStatus     @default(running)
+
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  agentConfigId String
+  agentConfig   AgentConfig @relation(fields: [agentConfigId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  benchmarkCases BenchmarkCase[]
+  healingEvents  HealingEvent[]
+  trialGroups    TrialGroup[]
+
+  @@index([taskId])
+}
+
+enum TaskType {
+  coding
+  data_analysis
+  sre
+  general
+}
+enum TaskComplexity {
+  low
+  medium
+  high
+  critical
+}
+enum TaskStatus {
+  running
+  completed
+  failed
+  timeout
+  abandoned
+}
+
+// ─── 4. Benchmark (fields 15-18) ──────────────────────
+model BenchmarkCase {
+  id              String       @id @default(cuid())
+  benchmarkCaseId String       @unique @db.VarChar(64)
+  bmDifficulty    BmDifficulty @default(medium)
+  bmTags          Json?
+  bmSource        BmSource     @default(manual)
+
+  taskInstanceId String
+  taskInstance   TaskInstance @relation(fields: [taskInstanceId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  healingEvents HealingEvent[]
+
+  @@index([benchmarkCaseId])
+}
+
+enum BmDifficulty {
+  low
+  medium
+  high
+}
+enum BmSource {
+  historical
+  manual
+  runbook
+  injection
+}
+
+// ─── 5-7. 自愈事件主表 (fields 19-48 + 117-196) ──────
+model HealingEvent {
+  id             String @id @default(cuid())
+  healingEventId String @unique @db.VarChar(64)
+
+  // ── 错误分类 L1-L5 (19-27) ──
+  errorLayer       ErrorLayer
+  errorType        String        @db.VarChar(64)
+  errorCode        String?       @db.VarChar(32)
+  errorMessage     String?       @db.Text
+  errorOccurredAt  DateTime
+  errorSeverity    ErrorSeverity @default(P2)
+  isCompositeError Boolean       @default(false)
+  rootCauseLayer   ErrorLayer?
+  causalChain      Json?
+
+  // ── 检测与诊断 (28-36) ──
+  detectedAt          DateTime?
+  mttdMs              BigInt?
+  detectionSource     DetectionSource @default(k8s_event)
+  diagnosisStrategy   String?         @db.VarChar(64)
+  runbookHit          Boolean         @default(false)
+  runbookId           String?         @db.VarChar(64)
+  runbookScore        Decimal?        @db.Decimal(4, 3)
+  alertGroupId        String?         @db.VarChar(64)
+  rootCauseConfidence Decimal?        @db.Decimal(4, 3)
+
+  // ── Harness 自愈执行 (37-48) ──
+  healingStrategy     String?  @db.VarChar(64)
+  totalSteps          Int      @default(0)
+  correctSteps        Int      @default(0)
+  stepAccuracy        Decimal? @db.Decimal(5, 4)
+  optimalSteps        Int      @default(0)
+  stepEfficiencyRatio Decimal? @db.Decimal(5, 4)
+  pathSimilarity      Decimal? @db.Decimal(5, 4)
+  degraded            Boolean  @default(false)
+  degradationType     String?  @db.VarChar(64)
+  rollbackTriggered   Boolean  @default(false)
+  sagaCompensationLog Json?
+
+  // ── 结果与验证 (117-124) ──
+  outcome          HealingOutcome @default(FAILED)
+  verified         Boolean        @default(false)
+  verificationType String?        @db.VarChar(64)
+  schemaPassed     Boolean        @default(false)
+  healthPassed     Boolean        @default(false)
+  businessPassed   Boolean        @default(false)
+  newAlertsAfter   Int            @default(0)
+  affectedScope    Int            @default(0)
+  affectedUsers    Int            @default(0)
+
+  // ── 资源消耗 (142-151) ──
+  totalTokens        Int      @default(0)
+  diagnosisTokens    Int      @default(0)
+  healingTokens      Int      @default(0)
+  verificationTokens Int      @default(0)
+  llmCallCount       Int      @default(0)
+  mcpToolCallCount   Int      @default(0)
+  llmApiCostUsd      Decimal? @db.Decimal(8, 4)
+  computeCostUsd     Decimal? @db.Decimal(8, 4)
+  totalCostUsd       Decimal? @db.Decimal(8, 4)
+  tokenEfficiency    Decimal? @db.Decimal(8, 4)
+
+  // ── 时间线 (152-164) ──
+  diagnosisCompletedAt    DateTime?
+  healingStartedAt        DateTime?
+  healingCompletedAt      DateTime?
+  verificationCompletedAt DateTime?
+  recoveredAt             DateTime?
+  mttrMs                  BigInt?
+  diagnosisDurationMs     BigInt?
+  healingDurationMs       BigInt?
+  verificationDurationMs  BigInt?
+  totalDurationMs         BigInt?
+
+  // ── 环境 (165-174) ──
+  environment      ExecEnvironment @default(prod)
+  k8sNamespace     String?         @db.VarChar(64)
+  k8sNode          String?         @db.VarChar(128)
+  podName          String?         @db.VarChar(128)
+  podCpuRequest    String?         @db.VarChar(16)
+  podMemoryRequest String?         @db.VarChar(16)
+  jvmHeapUsedMb    Int?
+  jvmThreadCount   Int?
+  hikariActive     Int?
+  hikariTotal      Int?
+
+  // ── 安全与审批 (175-180) ──
+  approvalRequired    Boolean        @default(false)
+  approvalStatus      ApprovalStatus @default(auto_approved)
+  approvalRespondedAt DateTime?
+  auditLogId          String?        @db.VarChar(64)
+  snapshotBefore      String?        @db.VarChar(256)
+  snapshotRestored    Boolean        @default(false)
+
+  // ── Runbook (181-186) ──
+  runbookStatus      RunbookStatus?
+  runbookSuccessRate Decimal? @db.Decimal(4, 3)
+  runbookTotalUses   Int      @default(0)
+  runbookUsedAt      DateTime?
+
+  // ── Hermes 学习 (187-191) ──
+  experienceRecorded    Boolean  @default(false)
+  expelInsightGenerated Boolean  @default(false)
+  runbookCreatedFrom    String?  @db.VarChar(64)
+  runbookUpdatedFrom    String?  @db.VarChar(64)
+  reflexionReviewed     Boolean  @default(false)
+
+  // ── 业务影响 (192-196) ──
+  userVisibleImpact Boolean  @default(false)
+  impactDurationMs  BigInt?
+  escalatedToHuman  Boolean  @default(false)
+  escalationReason  String?  @db.VarChar(128)
+  slaBreach         Boolean  @default(false)
+
+  // ── Relations ──
+  tenantId        String
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  agentConfigId   String
+  agentConfig     AgentConfig     @relation(fields: [agentConfigId], references: [id])
+  taskInstanceId  String
+  taskInstance    TaskInstance     @relation(fields: [taskInstanceId], references: [id])
+  benchmarkCaseId String?
+  benchmarkCase   BenchmarkCase?  @relation(fields: [benchmarkCaseId], references: [id])
+  createdAt       DateTime        @default(now())
+
+  healingActions     HealingAction[]
+  healingSteps       HealingStep[]
+  llmCallLogs        LlmCallLog[]
+  validationLogs     ValidationLog[]
+  circuitBreakerLogs CircuitBreakerLog[]
+  stateSnapshots     StateSnapshot[]
+  doomLoopEvents     DoomLoopEvent[]
+  freshContextLogs   FreshContextLog[]
+  runbookUsageLogs   RunbookUsageLog[]
+  reviewScores       ReviewScore[]
+  experienceRecords  ExperienceRecord[]
+  trialGroupItems    TrialGroupItem[]
+  graderScores       GraderScore[]
+
+  @@index([healingEventId])
+  @@index([errorLayer])
+  @@index([outcome])
+  @@index([errorOccurredAt])
+}
+
+enum ErrorLayer {
+  L1
+  L2
+  L3
+  L4
+  L5
+}
+enum ErrorSeverity {
+  P0
+  P1
+  P2
+  P3
+}
+enum DetectionSource {
+  k8s_event
+  mcp_proxy
+  jmx
+  skill_hook
+  alert
+}
+enum HealingOutcome {
+  SUCCESS
+  FAILED
+  PARTIAL
+  ESCALATED
+}
+enum ExecEnvironment {
+  prod
+  staging
+  eval
+}
+enum ApprovalStatus {
+  auto_approved
+  pending
+  approved
+  rejected
+}
+enum RunbookStatus {
+  active
+  review
+  dormant
+  deprecated
+}
+
+// ─── 8. 自愈执行详情 (fields 49-63) ──────────────────
+model HealingAction {
+  id                     String            @id @default(cuid())
+  healingPhase           HealingPhase      @default(recover)
+  healingActionDetail    String?           @db.Text
+  healingActionType      HealingActionType @default(restart)
+  healingTargetResource  String?           @db.VarChar(128)
+  healingCommand         String?           @db.Text
+  healingOutput          String?           @db.Text
+  healingExitCode        Int?
+  healingError           String?           @db.Text
+  healingDurationMs      BigInt?
+  healingIsIdempotent    Boolean           @default(false)
+  healingDrivenBy        HealingDrivenBy   @default(hardcoded_rule)
+  stateMachineTransition String?           @db.VarChar(128)
+  retryCount             Int               @default(0)
+  retryBackoffMs         Json?
+  retryJitterApplied     Boolean           @default(false)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([healingEventId])
+}
+
+enum HealingPhase {
+  detect
+  recover
+  degrade
+  prevent
+}
+enum HealingActionType {
+  k8s_patch
+  config_update
+  restart
+  fallback
+  install
+  cleanup
+}
+enum HealingDrivenBy {
+  runbook_step
+  llm_reasoning
+  hardcoded_rule
+  rescue_agent
+}
+
+// ─── Healing Steps ────────────────────────────────────
+model HealingStep {
+  id        String  @id @default(cuid())
+  stepSeq   Int
+  stepType  String? @db.VarChar(64)
+  action    String? @db.Text
+  result    String? @db.Text
+  isCorrect Boolean @default(false)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+}
+
+// ─── LLM Call Logs ───────────────────────────────────
+model LlmCallLog {
+  id               String   @id @default(cuid())
+  modelName        String   @db.VarChar(64)
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  latencyMs        Int?
+  cost             Decimal? @db.Decimal(8, 6)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+// ─── 9. 断路器与重试 (fields 64-77) ──────────────────
+model CircuitBreakerLog {
+  id                        String      @id @default(cuid())
+  circuitBreakerName        String?     @db.VarChar(64)
+  circuitBreakerStateBefore CBState     @default(CLOSED)
+  circuitBreakerStateAfter  CBState     @default(CLOSED)
+  circuitBreakerFailureRate Decimal?    @db.Decimal(5, 4)
+  circuitBreakerThreshold   Decimal?    @db.Decimal(5, 4)
+  circuitBreakerTransitions Int         @default(0)
+  modelFallbackChain        Json?
+  modelFallbackDepth        Int         @default(0)
+  modelOriginal             String?     @db.VarChar(64)
+  modelFinal                String?     @db.VarChar(64)
+  toolFallbackUsed          Boolean     @default(false)
+  toolOriginal              String?     @db.VarChar(64)
+  toolFinal                 String?     @db.VarChar(64)
+  halfOpenProbeResult       ProbeResult @default(not_probed)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+enum CBState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+enum ProbeResult {
+  success
+  failure
+  not_probed
+}
+
+// ─── 10. 恢复验证 (fields 78-89) ─────────────────────
+model ValidationLog {
+  id                         String           @id @default(cuid())
+  healthCheckIntervalMs      BigInt?
+  healthCheckTotal           Int              @default(0)
+  healthCheckPassed          Int              @default(0)
+  healthCheckFailed          Int              @default(0)
+  stabilityWindowMs          BigInt?
+  recoveryVerificationStages Json?
+  schemaValidationDetail     Json?
+  healthCheckEndpoint        String?          @db.VarChar(256)
+  businessValidationMethod   String?          @db.VarChar(128)
+  verificationAutoOrManual   VerificationMode @default(automatic)
+  verificationLatencyMs      BigInt?
+  postHealingQuietPeriodMs   BigInt?
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+enum VerificationMode {
+  automatic
+  manual
+  hybrid
+}
+
+// ─── 11. 自愈前后状态 (fields 90-103) ────────────────
+model StateSnapshot {
+  id                   String  @id @default(cuid())
+  preHealingState      Json?
+  postHealingState     Json?
+  stateDiff            Json?
+  resourcesBefore      Json?
+  resourcesAfter       Json?
+  configChanges        Json?
+  k8sAnnotationsBefore Json?
+  k8sAnnotationsAfter  Json?
+  snapshotId           String? @db.VarChar(64)
+  snapshotStoragePath  String? @db.VarChar(256)
+  rollbackAvailable    Boolean @default(false)
+  rollbackExecuted     Boolean @default(false)
+  rollbackReason       String? @db.VarChar(128)
+  rollbackDurationMs   BigInt?
+  rollbackSuccess      Boolean @default(false)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+// ─── 12. Doom-Loop (fields 104-110) ──────────────────
+model DoomLoopEvent {
+  id                   String           @id @default(cuid())
+  doomLoopTriggered    Boolean          @default(true)
+  doomLoopReason       DoomLoopReason?
+  doomLoopCount        Int              @default(0)
+  rescueAgentTriggered Boolean          @default(false)
+  rescueAgentSuccess   Boolean          @default(false)
+  rescueAgentSteps     Int              @default(0)
+  rescueAgentTokens    Int              @default(0)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+enum DoomLoopReason {
+  SAME_ERROR
+  RECURRENCE
+  QUALITY_DROP
+  TOKEN_NO_PROGRESS
+}
+
+// ─── 13. Fresh-context (fields 111-116) ──────────────
+model FreshContextLog {
+  id                   String       @id @default(cuid())
+  contextForkTriggered Boolean      @default(false)
+  forkReason           ForkReason?
+  preForkSteps         Int          @default(0)
+  preForkQuality       Decimal?     @db.Decimal(4, 3)
+  checkpointSummary    String?      @db.Text
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+enum ForkReason {
+  CONTRADICTION
+  STALE_DATA
+  QUALITY_DECLINE
+}
+
+// ─── Runbook 知识库 ──────────────────────────────────
+model RunbookEntry {
+  id           String        @id @default(cuid())
+  title        String        @db.VarChar(256)
+  errorPattern String        @db.Text
+  resolution   String        @db.Text
+  embedding    Json?
+  quality      Decimal?      @db.Decimal(4, 3)
+  status       RunbookStatus @default(review)
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  usageLogs RunbookUsageLog[]
+}
+
+// ─── Runbook 使用记录 ────────────────────────────────
+model RunbookUsageLog {
+  id      String         @id @default(cuid())
+  outcome HealingOutcome
+  duration Int?
+
+  entryId        String
+  runbookEntry   RunbookEntry @relation(fields: [entryId], references: [id])
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id])
+  usedAt         DateTime     @default(now())
+}
+
+// ─── GSB 评分 ────────────────────────────────────────
+model ReviewScore {
+  id        String   @id @default(cuid())
+  gsbScore  GSBScore
+  reasoning String?  @db.Text
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+enum GSBScore {
+  GOOD
+  SAME
+  BAD
+}
+
+// ─── 经验记录 ────────────────────────────────────────
+model ExperienceRecord {
+  id          String         @id @default(cuid())
+  errorType   String         @db.VarChar(64)
+  action      String         @db.Text
+  outcome     HealingOutcome
+  duration    Int?
+  contextHash String?        @db.VarChar(64)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+// ─── 14. Trial 试验 (fields 125-132) ─────────────────
+model TrialGroup {
+  id           String   @id @default(cuid())
+  trialGroupId String   @unique @db.VarChar(64)
+  trialGroupN  Int      @default(0)
+  trialGroupC  Int      @default(0)
+  passAtK      Decimal? @db.Decimal(5, 4)
+  passPowK     Decimal? @db.Decimal(5, 4)
+  gap          Decimal? @db.Decimal(5, 4)
+
+  taskInstanceId String
+  taskInstance   TaskInstance @relation(fields: [taskInstanceId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  items TrialGroupItem[]
+}
+
+model TrialGroupItem {
+  id            String @id @default(cuid())
+  trialSequence Int
+  trialK        Int    @default(3)
+
+  trialGroupId   String
+  trialGroup     TrialGroup   @relation(fields: [trialGroupId], references: [id], onDelete: Cascade)
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id])
+  createdAt      DateTime     @default(now())
+}
+
+// ─── 15. Grader 评分 (fields 133-141) ───────────────
+model GraderScore {
+  id String @id @default(cuid())
+
+  graderL1Pass      Boolean?
+  graderL2StepScore Decimal? @db.Decimal(5, 4)
+  graderL2PathScore Decimal? @db.Decimal(5, 4)
+  graderL2Gsb       GSBScore?
+  graderL2Reason    String?  @db.Text
+  graderL3Reviewed  Boolean  @default(false)
+  graderL3Override  Boolean  @default(false)
+  graderL3Reason    String?  @db.Text
+  finalScore        Decimal? @db.Decimal(5, 4)
+  graderLevel       GraderLevel @default(L1)
+
+  healingEventId String
+  healingEvent   HealingEvent @relation(fields: [healingEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([healingEventId])
+}
+
+enum GraderLevel {
+  L1
+  L2
+  L3
+}
