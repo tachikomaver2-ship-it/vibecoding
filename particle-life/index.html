@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Particle Life — 粒子生命</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;overflow:hidden;font-family:-apple-system,'PingFang SC',sans-serif;color:#fff}
+canvas{display:block;position:fixed;top:0;left:0}
+#panel{
+  position:fixed;top:0;right:0;width:320px;height:100vh;
+  background:rgba(10,10,18,0.92);backdrop-filter:blur(20px);
+  border-left:1px solid rgba(255,255,255,0.08);
+  padding:20px;overflow-y:auto;z-index:100;
+  transition:transform .3s cubic-bezier(.25,.8,.25,1)
+}
+#panel.hidden{transform:translateX(100%)}
+#panel h2{font-size:16px;margin-bottom:12px;color:rgba(255,255,255,0.9);letter-spacing:1px}
+#panel h3{font-size:12px;color:rgba(255,255,255,0.5);margin:14px 0 8px;text-transform:uppercase;letter-spacing:1px}
+.toggle-btn{
+  position:fixed;top:14px;right:14px;z-index:200;
+  background:rgba(255,255,255,0.08);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.12);color:#fff;
+  width:36px;height:36px;border-radius:50%;cursor:pointer;
+  font-size:16px;display:flex;align-items:center;justify-content:center;
+  transition:all .2s
+}
+.toggle-btn:hover{background:rgba(255,255,255,0.15)}
+.species-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.species-dot{width:20px;height:20px;border-radius:50%;flex-shrink:0;cursor:pointer}
+.species-name{font-size:12px;flex:1;color:rgba(255,255,255,0.7)}
+.species-count{font-size:11px;color:rgba(255,255,255,0.4);width:36px;text-align:right}
+#matrix{display:grid;gap:2px;margin:8px 0}
+.matrix-cell{
+  width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;
+  transition:transform .15s;position:relative
+}
+.matrix-cell:hover{transform:scale(1.2);z-index:1}
+.matrix-cell::after{content:attr(data-v);position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;font-size:8px;color:rgba(255,255,255,0.6);
+  opacity:0;transition:opacity .15s}
+.matrix-cell:hover::after{opacity:1}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.btn{
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.7);padding:5px 12px;border-radius:14px;
+  font-size:11px;cursor:pointer;transition:all .2s;white-space:nowrap
+}
+.btn:hover{background:rgba(255,255,255,0.12);color:#fff}
+.btn.active{background:rgba(100,140,255,0.2);border-color:rgba(100,140,255,0.4);color:#fff}
+.slider-row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.slider-row label{font-size:11px;color:rgba(255,255,255,0.5);width:60px;flex-shrink:0}
+.slider-row input[type=range]{flex:1;accent-color:#648cff;height:3px}
+.slider-row .val{font-size:10px;color:rgba(255,255,255,0.4);width:30px;text-align:right}
+#stats{position:fixed;bottom:14px;left:14px;font-size:11px;color:rgba(255,255,255,0.3);z-index:100}
+#title{position:fixed;top:14px;left:20px;z-index:100;font-size:14px;font-weight:600;color:rgba(255,255,255,0.7);letter-spacing:1px}
+#title span{font-size:11px;font-weight:400;color:rgba(255,255,255,0.35);display:block;margin-top:2px}
+@media(max-width:768px){
+  #panel{width:100%;height:50vh;top:auto;bottom:0;border-left:none;border-top:1px solid rgba(255,255,255,0.08)}
+  #panel.hidden{transform:translateY(100%)}
+  .toggle-btn{top:auto;bottom:14px;right:14px}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title">Particle Life<span>粒子生命模拟</span></div>
+<button class="toggle-btn" id="togglePanel">☰</button>
+<div id="panel">
+  <h2>物种面板</h2>
+  <div id="speciesList"></div>
+  <div class="btn-row">
+    <div class="btn" id="addSpecies">+ 物种</div>
+    <div class="btn" id="removeSpecies">- 物种</div>
+  </div>
+
+  <h3>力矩阵（行→列）</h3>
+  <div id="matrix"></div>
+  <div class="btn-row">
+    <div class="btn" id="randomMatrix">随机</div>
+    <div class="btn" id="symmetric">对称</div>
+    <div class="btn" id="antisym">反对称</div>
+  </div>
+
+  <h3>预设生态</h3>
+  <div class="btn-row" id="presets"></div>
+
+  <h3>参数</h3>
+  <div class="slider-row">
+    <label>粒子数</label>
+    <input type="range" id="sCount" min="200" max="3000" step="100" value="1200">
+    <span class="val" id="vCount">1200</span>
+  </div>
+  <div class="slider-row">
+    <label>作用半径</label>
+    <input type="range" id="sRadius" min="20" max="200" step="5" value="80">
+    <span class="val" id="vRadius">80</span>
+  </div>
+  <div class="slider-row">
+    <label>摩擦力</label>
+    <input type="range" id="sFriction" min="0" max="100" step="1" value="50">
+    <span class="val" id="vFriction">0.50</span>
+  </div>
+  <div class="slider-row">
+    <label>粒子大小</label>
+    <input type="range" id="sSize" min="1" max="8" step="0.5" value="3">
+    <span class="val" id="vSize">3.0</span>
+  </div>
+
+  <h3>操作</h3>
+  <div class="btn-row">
+    <div class="btn" id="resetBtn">重置粒子</div>
+    <div class="btn" id="exportBtn">保存图片</div>
+    <div class="btn" id="pauseBtn">暂停</div>
+  </div>
+</div>
+<div id="stats"></div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ===== SPECIES =====
+const COLORS = [
+  { name: '赤', hex: '#ff4444', r: 255, g: 68, b: 68 },
+  { name: '翠', hex: '#00cc88', r: 0, g: 204, b: 136 },
+  { name: '蓝', hex: '#4488ff', r: 68, g: 136, b: 255 },
+  { name: '金', hex: '#ffaa00', r: 255, g: 170, b: 0 },
+  { name: '紫', hex: '#aa44ff', r: 170, g: 68, b: 255 },
+  { name: '粉', hex: '#ff66aa', r: 255, g: 102, b: 170 },
+  { name: '青', hex: '#00cccc', r: 0, g: 204, b: 204 },
+  { name: '白', hex: '#cccccc', r: 204, g: 204, b: 204 },
+];
+
+let numSpecies = 5;
+let forceMatrix = [];
+let particles = [];
+let numParticles = 1200;
+let interactionRadius = 80;
+let friction = 0.5;
+let particleSize = 3;
+let paused = false;
+
+function initMatrix(n) {
+  forceMatrix = [];
+  for (let i = 0; i < n; i++) {
+    forceMatrix[i] = [];
+    for (let j = 0; j < n; j++) {
+      forceMatrix[i][j] = Math.random() * 2 - 1;
+    }
+  }
+}
+
+function initParticles(n) {
+  particles = [];
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: 0, vy: 0,
+      species: Math.floor(Math.random() * numSpecies)
+    });
+  }
+}
+
+// ===== PRESETS (optimized: curated force matrices for emergent behaviors) =====
+const PRESETS = {
+  chaos: {
+    name: '混沌',
+    matrix: () => { const m = []; for (let i = 0; i < numSpecies; i++) { m[i] = []; for (let j = 0; j < numSpecies; j++) m[i][j] = Math.random() * 2 - 1; } return m; }
+  },
+  cells: {
+    name: '细胞',
+    matrix: () => {
+      const m = [];
+      for (let i = 0; i < numSpecies; i++) {
+        m[i] = [];
+        for (let j = 0; j < numSpecies; j++) {
+          m[i][j] = i === j ? -0.1 : 0.15;
+        }
+        m[i][i] = -0.1 + Math.random() * 0.05;
+      }
+      return m;
+    }
+  },
+  chase: {
+    name: '捕食',
+    matrix: () => {
+      const m = [];
+      for (let i = 0; i < numSpecies; i++) {
+        m[i] = [];
+        for (let j = 0; j < numSpecies; j++) {
+          const next = (i + 1) % numSpecies;
+          m[i][j] = j === next ? 0.5 : j === i ? -0.1 : 0;
+        }
+      }
+      return m;
+    }
+  },
+  crystal: {
+    name: '结晶',
+    matrix: () => {
+      const m = [];
+      for (let i = 0; i < numSpecies; i++) {
+        m[i] = [];
+        for (let j = 0; j < numSpecies; j++) {
+          m[i][j] = i === j ? 0.02 : -0.005;
+        }
+      }
+      return m;
+    }
+  },
+  swarm: {
+    name: '蜂群',
+    matrix: () => {
+      const m = [];
+      for (let i = 0; i < numSpecies; i++) {
+        m[i] = [];
+        for (let j = 0; j < numSpecies; j++) {
+          m[i][j] = 0.02 + Math.random() * 0.01;
+        }
+        m[i][i] = -0.02;
+      }
+      return m;
+    }
+  },
+  galaxy: {
+    name: '星系',
+    matrix: () => {
+      const m = [];
+      for (let i = 0; i < numSpecies; i++) {
+        m[i] = [];
+        for (let j = 0; j < numSpecies; j++) {
+          const angle = (i - j) * Math.PI * 2 / numSpecies;
+          m[i][j] = Math.sin(angle) * 0.3;
+        }
+      }
+      return m;
+    }
+  },
+};
+
+// ===== PHYSICS =====
+function update() {
+  if (paused) return;
+  const r2 = interactionRadius * interactionRadius;
+  const repelDist = interactionRadius * 0.3;
+
+  for (let i = 0; i < particles.length; i++) {
+    const a = particles[i];
+    let fx = 0, fy = 0;
+
+    for (let j = 0; j < particles.length; j++) {
+      if (i === j) continue;
+      const b = particles[j];
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+
+      // Toroidal wrapping
+      if (dx > W / 2) dx -= W;
+      if (dx < -W / 2) dx += W;
+      if (dy > H / 2) dy -= H;
+      if (dy < -H / 2) dy += H;
+
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2 || d2 < 0.01) continue;
+
+      const d = Math.sqrt(d2);
+      dx /= d;
+      dy /= d;
+
+      if (d < repelDist) {
+        // Strong repulsion at close range
+        const f = (d / repelDist - 1) * 5;
+        fx += dx * f;
+        fy += dy * f;
+      } else {
+        // Force from matrix
+        const f = forceMatrix[a.species]?.[b.species] ?? 0;
+        const beta = (d - repelDist) / (interactionRadius - repelDist);
+        const strength = beta < 0.5 ? 2 * beta : 2 * (1 - beta);
+        fx += dx * strength * f;
+        fy += dy * strength * f;
+      }
+    }
+
+    a.vx = (a.vx + fx) * (1 - friction);
+    a.vy = (a.vy + fy) * (1 - friction);
+  }
+
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    // Toroidal wrap
+    if (p.x < 0) p.x += W;
+    if (p.x >= W) p.x -= W;
+    if (p.y < 0) p.y += H;
+    if (p.y >= H) p.y -= H;
+  }
+}
+
+// ===== RENDER =====
+function draw() {
+  ctx.fillStyle = 'rgba(10,10,18,0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const p of particles) {
+    const c = COLORS[p.species % COLORS.length];
+    ctx.fillStyle = c.hex;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, particleSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ===== LOOP =====
+let frameCount = 0, lastFpsTime = performance.now(), fps = 0;
+
+function loop() {
+  update();
+  draw();
+  frameCount++;
+  const now = performance.now();
+  if (now - lastFpsTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+  document.getElementById('stats').textContent = `${fps} FPS · ${particles.length} 粒子 · ${numSpecies} 物种`;
+  requestAnimationFrame(loop);
+}
+
+// ===== UI =====
+function updateUI() {
+  // Species list
+  const list = document.getElementById('speciesList');
+  list.innerHTML = '';
+  for (let i = 0; i < numSpecies; i++) {
+    const c = COLORS[i % COLORS.length];
+    const count = particles.filter(p => p.species === i).length;
+    list.innerHTML += `
+      <div class="species-row">
+        <div class="species-dot" style="background:${c.hex}"></div>
+        <span class="species-name">${c.name}种</span>
+        <span class="species-count">${count}</span>
+      </div>`;
+  }
+
+  // Force matrix
+  const mat = document.getElementById('matrix');
+  mat.style.gridTemplateColumns = `repeat(${numSpecies}, 1fr)`;
+  mat.innerHTML = '';
+  for (let i = 0; i < numSpecies; i++) {
+    for (let j = 0; j < numSpecies; j++) {
+      const v = forceMatrix[i]?.[j] ?? 0;
+      const r = v > 0 ? Math.round(v * 200) : 0;
+      const b = v < 0 ? Math.round(-v * 200) : 0;
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      cell.style.background = `rgb(${r},${Math.max(0, 80 - Math.abs(v) * 80)},${b})`;
+      cell.dataset.v = v.toFixed(2);
+      cell.onclick = () => {
+        forceMatrix[i][j] = forceMatrix[i][j] > 0.7 ? -1 : forceMatrix[i][j] + 0.25;
+        updateUI();
+      };
+      mat.appendChild(cell);
+    }
+  }
+}
+
+// Presets
+const presetsEl = document.getElementById('presets');
+Object.entries(PRESETS).forEach(([key, preset]) => {
+  const btn = document.createElement('div');
+  btn.className = 'btn';
+  btn.textContent = preset.name;
+  btn.onclick = () => {
+    forceMatrix = preset.matrix();
+    resetParticles();
+    updateUI();
+  };
+  presetsEl.appendChild(btn);
+});
+
+// Controls
+document.getElementById('addSpecies').onclick = () => {
+  if (numSpecies < 8) {
+    numSpecies++;
+    const old = forceMatrix;
+    forceMatrix = [];
+    for (let i = 0; i < numSpecies; i++) {
+      forceMatrix[i] = [];
+      for (let j = 0; j < numSpecies; j++) {
+        forceMatrix[i][j] = old[i]?.[j] ?? (Math.random() * 2 - 1);
+      }
+    }
+    particles.forEach(p => { if (p.species >= numSpecies) p.species = numSpecies - 1; });
+    updateUI();
+  }
+};
+
+document.getElementById('removeSpecies').onclick = () => {
+  if (numSpecies > 2) {
+    numSpecies--;
+    forceMatrix = forceMatrix.slice(0, numSpecies).map(r => r.slice(0, numSpecies));
+    particles = particles.filter(p => p.species < numSpecies);
+    updateUI();
+  }
+};
+
+document.getElementById('randomMatrix').onclick = () => { initMatrix(numSpecies); updateUI(); };
+document.getElementById('symmetric').onclick = () => {
+  for (let i = 0; i < numSpecies; i++)
+    for (let j = i + 1; j < numSpecies; j++)
+      forceMatrix[j][i] = forceMatrix[i][j];
+  updateUI();
+};
+document.getElementById('antisym').onclick = () => {
+  for (let i = 0; i < numSpecies; i++)
+    for (let j = i + 1; j < numSpecies; j++)
+      forceMatrix[j][i] = -forceMatrix[i][j];
+  updateUI();
+};
+
+function resetParticles() {
+  const n = parseInt(document.getElementById('sCount').value);
+  numParticles = n;
+  initParticles(n);
+}
+
+document.getElementById('resetBtn').onclick = () => { resetParticles(); updateUI(); };
+document.getElementById('pauseBtn').onclick = function() {
+  paused = !paused;
+  this.textContent = paused ? '继续' : '暂停';
+  this.classList.toggle('active', paused);
+};
+document.getElementById('exportBtn').onclick = () => {
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, W, H);
+  for (const p of particles) {
+    const c = COLORS[p.species % COLORS.length];
+    ctx.fillStyle = c.hex;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, particleSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  canvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `particle-life-${Date.now()}.png`;
+    a.click();
+  });
+};
+
+// Sliders
+document.getElementById('sCount').oninput = function() {
+  document.getElementById('vCount').textContent = this.value;
+};
+document.getElementById('sCount').onchange = () => { resetParticles(); updateUI(); };
+document.getElementById('sRadius').oninput = function() {
+  interactionRadius = +this.value;
+  document.getElementById('vRadius').textContent = this.value;
+};
+document.getElementById('sFriction').oninput = function() {
+  friction = +this.value / 100;
+  document.getElementById('vFriction').textContent = friction.toFixed(2);
+};
+document.getElementById('sSize').oninput = function() {
+  particleSize = +this.value;
+  document.getElementById('vSize').textContent = (+this.value).toFixed(1);
+};
+
+// Panel toggle
+document.getElementById('togglePanel').onclick = () => {
+  document.getElementById('panel').classList.toggle('hidden');
+};
+
+// Touch to add particles
+canvas.addEventListener('click', e => {
+  for (let i = 0; i < 20; i++) {
+    particles.push({
+      x: e.clientX + (Math.random() - 0.5) * 30,
+      y: e.clientY + (Math.random() - 0.5) * 30,
+      vx: (Math.random() - 0.5) * 5,
+      vy: (Math.random() - 0.5) * 5,
+      species: Math.floor(Math.random() * numSpecies)
+    });
+  }
+});
+
+// ===== INIT =====
+initMatrix(numSpecies);
+initParticles(numParticles);
+updateUI();
+loop();
+</script>
+</body>
+</html>
