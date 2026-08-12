@@ -1,0 +1,31 @@
+{
+  "name": "ai-marketing-team",
+  "version": "0.1.0",
+  "description": "Multi-agent AI marketing team + data-analysis/visualization agent, hosted in an Electron desktop app. Architected after high-star open-source marketing-agent projects (CrewAI / LangGraph).",
+  "main": "out/main/index.js",
+  "author": "tachikomaver2-ship-it",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "agent:run": "tsx scripts/run-headless.ts"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.3",
+    "chartjs-adapter-date-fns": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.3.0",
+    "electron-vite": "^2.3.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.4"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.27.3",
+    "openai": "^4.56.0"
+  }
+}

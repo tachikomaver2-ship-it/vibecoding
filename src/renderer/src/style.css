@@ -1,0 +1,100 @@
+:root {
+  --bg: #0f1220;
+  --panel: #171b2e;
+  --panel-2: #1f2540;
+  --accent: #3880ff;
+  --accent-2: #22d3a6;
+  --text: #e6e9f5;
+  --muted: #9aa3c0;
+  --border: #2a3157;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.topbar {
+  padding: 14px 22px;
+  background: linear-gradient(90deg, #1a1f3a, #11152a);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .brand { font-size: 18px; font-weight: 700; }
+.topbar .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr 1fr;
+  gap: 14px;
+  padding: 14px;
+  height: calc(100vh - 60px);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  overflow: auto;
+}
+.panel h2 { margin: 0 0 10px; font-size: 14px; color: var(--accent-2); }
+
+label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+input, select, textarea {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+}
+textarea { resize: vertical; }
+
+button#runBtn {
+  margin-top: 14px;
+  width: 100%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button#runBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status { margin-top: 10px; font-size: 12px; color: var(--muted); min-height: 16px; }
+
+.log {
+  background: #0b0e1a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: #b9c2e6;
+  min-height: 200px;
+}
+
+.result-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.result-card h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+.result-card .doc { font-size: 13px; line-height: 1.6; }
+.result-card pre {
+  background: #0b0e1a; border-radius: 8px; padding: 10px; overflow: auto; font-size: 11px;
+}
+.chart-wrap { max-width: 100%; }
+
+.tag { display:inline-block; font-size: 11px; color: var(--muted); border:1px solid var(--border); border-radius: 6px; padding: 1px 6px; margin-left: 6px;}
