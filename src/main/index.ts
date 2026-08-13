@@ -2,7 +2,9 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { runAgent } from '../agents/index.js'
+import { getProvider } from '../agents/llmProvider.js'
 import { IPC } from '../shared/protocol.js'
+import { loadSettings, saveSettings } from './settings.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,11 +31,35 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // ---- Agent task runner (uses the configured provider) ----
   ipcMain.handle(IPC.RUN_AGENT, async (event, req) => {
     const log = (msg: string) => event.sender.send(IPC.LOG, msg)
-    const results = await runAgent(req.type, req.input, log)
+    const results = await runAgent(req.type, req.input, log, loadSettings())
     return { results }
   })
+
+  // ---- Chat (conversational window) with streaming deltas ----
+  ipcMain.handle(IPC.CHAT, async (event, req) => {
+    const settings = loadSettings()
+    const provider = getProvider(settings)
+    let full = ''
+    try {
+      full = await provider.chat(req.messages, {
+        system: req.system,
+        onDelta: (d) => event.sender.send(IPC.CHAT_DELTA, d)
+      })
+    } catch (e: any) {
+      const errMsg = `\n\n> ⚠️ 模型调用失败：${e?.message ?? e}\n> 请检查 ⚙️ 设置中的 API Key / baseURL / 网络。`
+      event.sender.send(IPC.CHAT_DELTA, errMsg)
+      full += errMsg
+    }
+    event.sender.send(IPC.CHAT_DONE, full)
+    return full
+  })
+
+  // ---- Settings persistence ----
+  ipcMain.handle(IPC.SETTINGS_GET, () => loadSettings())
+  ipcMain.handle(IPC.SETTINGS_SAVE, (_e, s) => saveSettings(s))
 
   createWindow()
 

@@ -45,6 +45,22 @@ inspired by high-star open-source marketing-agent projects:
 
 Both run inside the Electron main process and stream logs to the UI.
 
+## 对话窗口 & 接入 AI 模型
+
+桌面端内置一个**对话窗口**（顶部 Tab「💬 对话」），以及一个**模型设置面板**
+（右上角「⚙️ 设置」）。配置会持久化到 `<userData>/settings.json`，即时生效。
+
+- **Demo（默认）**：无需任何 Key，使用模板式回复，开箱即用，方便本地调试。
+- **OpenAI / 兼容**：填入 API Key + 模型名（默认 `gpt-4o-mini`）；可填 **Base URL** 接入
+  任意 OpenAI 兼容服务（DeepSeek、Moonshot、本地 vLLM 等）。
+- **Anthropic**：填入 API Key + 模型名（默认 `claude-3-5-sonnet-20241022`）。
+
+对话通过 `chat:send` IPC 调用主进程的 `provider.chat()`，以**流式**（token-by-token）回传
+（`chat:delta` → `chat:done`），渲染层实时拼接气泡内容。「🛠 任务 Agent」标签页同样会
+使用这里配置的模型。
+
+> 也可走环境变量方式（见下文「Use a real LLM」），二者二选一；界面设置优先级更高。
+
 ## Quick start (no API key)
 
 The default LLM provider is `demo` (template-based), so everything runs out of the box.

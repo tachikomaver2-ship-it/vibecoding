@@ -41,9 +41,20 @@ export interface AgentInput {
   extra?: Record<string, unknown>
 }
 
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 export interface LLMProvider {
   name: string
+  /** One-shot completion (used by the agent pipelines). */
   complete(prompt: string, opts?: { system?: string; json?: boolean }): Promise<string>
+  /** Multi-turn chat with streaming deltas. `onDelta` is called as tokens arrive. */
+  chat(
+    messages: ChatMessage[],
+    opts?: { system?: string; onDelta?: (delta: string) => void }
+  ): Promise<string>
 }
 
 export interface RunContext {
