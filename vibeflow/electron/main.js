@@ -84,7 +84,9 @@ ipcMain.handle('vibe:importFromGithub', async (_e, a) => {
 });
 
 app.whenReady().then(() => {
+  console.log('[vibeflow] main process ready, dataPath =', dataPath);
   createWindow();
+  console.log('[vibeflow] main window created');
   if (store.state.settings && store.state.settings.webhookEnabled) {
     try {
       startWebhook(store, emit);
