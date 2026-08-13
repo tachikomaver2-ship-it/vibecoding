@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "start": "electron .",
     "dev": "node scripts/dev.mjs",
-    "dist": "vite build && electron-builder"
+    "dist": "vite build && electron-builder",
+    "postinstall": "node scripts/fix-electron-path.cjs"
   },
   "author": "tachikomaver2-ship-it",
   "license": "MIT",
