@@ -14,6 +14,7 @@
     "postinstall": "node scripts/fix-electron-path.cjs",
     "allow-electron": "node scripts/allow-electron.cjs",
     "use-signed-electron": "node scripts/use-signed-electron.cjs",
+    "fix-electron": "node scripts/fix-electron-macos.cjs",
     "web": "npm run build && node server.cjs",
     "web:dev": "node scripts/dev-web.mjs"
   },
