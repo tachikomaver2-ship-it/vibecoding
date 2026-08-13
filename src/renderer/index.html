@@ -23,12 +23,17 @@
     <!-- ============ CHAT VIEW ============ -->
     <main id="view-chat" class="view active">
       <section class="chat-wrap">
+        <div class="chat-actions">
+          <button id="quickMarketing" class="quick-btn">📋 生成营销方案</button>
+          <button id="quickAnalytics" class="quick-btn">📊 数据分析图表</button>
+          <span id="chatStatus" class="chat-status"></span>
+        </div>
         <div id="messages" class="messages">
           <div class="msg assistant">
             <div class="bubble">
-              你好，我是你的 AI 营销团队助手。可以直接在这里问我营销、增长、投放相关的问题，
-              也可以切到「🛠 任务 Agent」生成完整方案或数据分析图表。<br /><br />
-              点击右上角 <b>⚙️ 设置</b> 接入真实大模型（OpenAI / Anthropic / 兼容端点）。
+              你好，我是你的 <b>AI 营销团队助手</b>。可以直接在这里问我营销、增长、投放、内容策略相关问题；
+              也可以点上方 <b>📋 生成营销方案</b> 一键召唤「市场研究 → 内容策略 → 文案 → SEO」团队产出完整方案。<br /><br />
+              点击右上角 <b>⚙️ 设置</b> 接入真实大模型（OpenAI / Anthropic / 兼容端点，如 DeepSeek、Moonshot）。
             </div>
           </div>
         </div>

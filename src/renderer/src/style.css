@@ -81,6 +81,38 @@ html, body {
   height: 100%;
   padding: 12px;
 }
+
+/* ---- Chat quick-action bar ---- */
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.quick-btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.quick-btn:hover { border-color: var(--accent); background: #232a4d; }
+.chat-status { font-size: 12px; color: var(--accent-2); margin-left: auto; }
+.bubble.typing { color: var(--muted); font-style: italic; }
+
+/* ---- API-not-ready banner ---- */
+.api-warn {
+  background: #3a1620;
+  color: #ffb4c4;
+  border-bottom: 1px solid #6b2333;
+  padding: 10px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .messages {
   flex: 1;
   overflow-y: auto;

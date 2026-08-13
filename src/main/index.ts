@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 import { runAgent } from '../agents/index.js'
 import { getProvider } from '../agents/llmProvider.js'
 import { IPC } from '../shared/protocol.js'
@@ -11,13 +12,34 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const isDev = !app.isPackaged
 
+// Persona used for the conversational chat window — keeps the assistant in the
+// "marketing team" lane (mirrors the role framing of high-star marketing agents).
+const CHAT_SYSTEM_PROMPT =
+  'You are "AI Marketing Team", a senior marketing copilot. ' +
+  'You help with growth, paid/organic acquisition, content strategy, copywriting, ' +
+  'SEO, positioning, and campaign planning. ' +
+  'Be concise and concrete: lead with the recommendation, then the reasoning. ' +
+  'Use short markdown (headings, bullets, tables) and include 1–2 actionable next steps. ' +
+  'If the user asks to "generate a plan / 方案 / 营销方案", summarize what a full ' +
+  'multi-agent run would produce and suggest using the 📋 生成营销方案 button. ' +
+  'Respond in the user’s language (Chinese if they write in Chinese).'
+
 function createWindow() {
+  const preloadPath = path.join(__dirname, '../preload/index.js')
+  if (isDev) {
+    console.log('[main] preload path:', preloadPath)
+    try {
+      fs.accessSync(preloadPath)
+    } catch {
+      console.error('[main] ⚠️ preload script NOT FOUND at', preloadPath)
+    }
+  }
   const win = new BrowserWindow({
     width: 1180,
     height: 820,
     backgroundColor: '#0f1220',
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -42,10 +64,11 @@ app.whenReady().then(() => {
   ipcMain.handle(IPC.CHAT, async (event, req) => {
     const settings = loadSettings()
     const provider = getProvider(settings)
+    const system = req.system || CHAT_SYSTEM_PROMPT
     let full = ''
     try {
       full = await provider.chat(req.messages, {
-        system: req.system,
+        system,
         onDelta: (d) => event.sender.send(IPC.CHAT_DELTA, d)
       })
     } catch (e: any) {

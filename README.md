@@ -128,6 +128,20 @@ npm run agent:run -- --type marketing --goal "..."
 
 `openai` and `@anthropic-ai/sdk` are optional dependencies and only loaded when selected.
 
+## 本机常见问题排查（Troubleshooting）
+
+- **点「⚙️ 设置」或按 Enter 没反应 / 对话发不出去**：界面顶部若出现红色横幅
+  `⚠️ 模型接口未加载（preload 未就绪）`，说明 Electron 的 preload 脚本没挂上 `agentApi`。
+  排查顺序：
+  1. 确认本机 `npm install` 完整（Electron 二进制 + electron-vite 都装好）。网络不佳时用镜像：
+     `npm_config_registry=https://registry.npmmirror.com npm install`，并用
+     `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install`。
+  2. 终端里看启动日志，dev 模式会打印 `[main] preload path: ...`；若提示
+     `preload script NOT FOUND`，说明构建产物缺失，先 `npm run build` 再 `npm run dev`。
+  3. 重新 `npm run dev`（需先 `npm run build` 生成 `out/`，dev 与 build 共用 `out/preload`）。
+- **配置了 API Key 仍走 Demo**：保存后在右上角看徽标是否变为 `OpenAI` / `Anthropic`；
+  若仍调用失败，对话里会返回 `⚠️ 模型调用失败` 提示，按提示检查 Key / baseURL / 网络。
+
 ## Project layout
 
 ```
