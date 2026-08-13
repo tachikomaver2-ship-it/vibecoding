@@ -61,6 +61,47 @@ npm run agent:run -- --type marketing --goal "为新的 SaaS 产品做社媒营�
 npm run agent:run -- --type analytics --csvPath ./data/sample_campaign.csv
 ```
 
+## Local debugging
+
+Everything runs on your machine — no backend required (default `demo` LLM provider).
+
+### 1. Launch the GUI (Electron)
+
+```bash
+npm install
+npm run dev            # launches the Electron window with DevTools available
+```
+
+In the Electron window, open DevTools any time with **Cmd + Option + I** (macOS) to
+inspect the renderer (UI logic, Chart.js, IPC calls).
+
+### 2. Debug the main process (agents running in Node)
+
+`npm run debug` launches Electron with the Node inspector on port **5858**:
+
+```bash
+npm run debug
+```
+
+Then in VS Code run the **"Debug Main Process"** attach config (`.vscode/launch.json`).
+You can now set breakpoints in `src/main/`, `src/agents/`, `src/shared/`.
+
+### 3. Debug an agent without the GUI
+
+The **"Run Headless Agent (debug)"** VS Code config launches the CLI runner under the
+debugger. Or from the terminal:
+
+```bash
+npm run agent:run -- --type marketing --goal "为新的 SaaS 产品做社媒营销" --brand "Acme"
+npm run agent:run -- --type analytics --csvPath ./data/sample_campaign.csv
+```
+
+### 4. Type-check only
+
+```bash
+npm run typecheck
+```
+
 ## Use a real LLM
 
 ```bash

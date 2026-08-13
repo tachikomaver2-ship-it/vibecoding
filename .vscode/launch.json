@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Main Process",
+      "type": "node",
+      "request": "attach",
+      "port": 5858,
+      "restart": true,
+      "protocol": "inspector",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Run Headless Agent (debug)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/run-headless.ts",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx"],
+      "args": ["--type", "marketing", "--goal", "为新的 SaaS 产品做社媒营销", "--brand", "Acme"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

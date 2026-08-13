@@ -5,9 +5,9 @@
   "main": "out/main/index.js",
   "author": "tachikomaver2-ship-it",
   "license": "MIT",
-  "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
+    "debug": "electron-vite dev -- --inspect-brk=5858",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
