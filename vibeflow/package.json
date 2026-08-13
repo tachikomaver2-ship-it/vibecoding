@@ -11,7 +11,8 @@
     "start": "electron .",
     "dev": "node scripts/dev.mjs",
     "dist": "vite build && electron-builder",
-    "postinstall": "node scripts/fix-electron-path.cjs"
+    "postinstall": "node scripts/fix-electron-path.cjs",
+    "allow-electron": "node scripts/allow-electron.cjs"
   },
   "author": "tachikomaver2-ship-it",
   "license": "MIT",
