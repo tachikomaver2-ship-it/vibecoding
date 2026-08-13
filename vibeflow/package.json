@@ -13,7 +13,9 @@
     "dist": "vite build && electron-builder",
     "postinstall": "node scripts/fix-electron-path.cjs",
     "allow-electron": "node scripts/allow-electron.cjs",
-    "use-signed-electron": "node scripts/use-signed-electron.cjs"
+    "use-signed-electron": "node scripts/use-signed-electron.cjs",
+    "web": "npm run build && node server.cjs",
+    "web:dev": "node scripts/dev-web.mjs"
   },
   "author": "tachikomaver2-ship-it",
   "license": "MIT",
