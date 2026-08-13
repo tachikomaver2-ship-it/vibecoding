@@ -66,6 +66,23 @@ npm start
 - 从文件批量导入（按空行拆分，首行作标题）。
 - 从 GitHub Issues 导入（需本机已 `gh` 登录）。
 - 每条灵感可「审核通过 → 进入想法阶段」或「忽略」。
+- **所有灵感（手动 / 文件 / Webhook / GitHub / Slack）自动同步进底层知识库 kbase**——见下节。
+
+### 3.5 知识库后端（kbase · 开源 LLM-Wiki）
+底层知识库采用开源 **LLM-Wiki 项目 kbase**（[gitee.com/dxdbc/kbase](https://gitee.com/dxdbc/kbase)）的存储规范，让每条灵感真正落盘为可被语义检索的知识，而不是只存在内存 JSON 里。
+
+- **落盘结构**：每条灵感写入 `raw/`（原始资料）+ `wiki/`（结构化知识页），与 kbase 完全兼容，可被其 MCP Server 直接读取复用。
+  ```
+  <userData>/kbase/        # 或浏览器模式下的 .vibeflow-data/kbase/
+  ├── raw/                 # 原始灵感原文
+  ├── wiki/                # 结构化知识页面（检索对象）
+  ├── thoughts/            # 预留：个人思想宝库
+  └── kbase-index.json     # 本地 BM25 倒排索引
+  ```
+- **语义检索**：内置轻量 **BM25 索引**（中文按字 bigram、拉丁按词），在「📚 知识库」页用自然语言即可检索，例如「语音记录灵感」「多维表格 数据看板」。
+- **完全离线、不依赖任何外部服务**：无需 Qdrant / embedding 模型 / API Key；后续若想换用 kbase 原生的 Qdrant + bge-m3 向量检索，只需把同一目录挂到 kbase 的 MCP Server 即可，文件布局零改动。
+- **贯穿全流程**：目标详情抽屉会按标题+描述自动拉取「相关知识点（kbase）」；执行 Vibe Coding 时，相关知识也会被注入生成提示，让代码更贴合已有积累。
+- **查看 / 打开**：侧边栏「📚 知识库」页可检索与浏览全部知识，并一键打开知识库目录。
 
 ### 4. 连接器配置
 - **手动剪贴板 / 文件**：通用入口。
@@ -115,7 +132,8 @@ vibeflow/
 │   ├── vibecode.js    # Vibe Coding 引擎（默认本地 Aider + 本地模型，可选云端回退）
 │   ├── codex.js       # 离线启发式任务规划（不依赖外部）
 │   ├── github.js      # 通过 gh CLI 拉取 Issue
-│   └── webhook.js     # 本地 Webhook 接收服务
+│   ├── webhook.js     # 本地 Webhook 接收服务
+│   └── kbase.js       # 知识库后端（kbase 兼容 LLM-Wiki，本地 BM25 索引，不依赖外部）
 ├── shared/
 │   └── stages.json    # 阶段定义（顺序 / 颜色 / 基线进度 / 说明）
 ├── src/               # React 渲染进程（Vite）

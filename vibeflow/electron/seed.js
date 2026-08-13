@@ -178,6 +178,10 @@ function buildSeed() {
       },
       webhookPort: 18720,
       webhookEnabled: true,
+      kbase: {
+        enabled: true, // inspirations are persisted into the kbase LLM-Wiki backend
+        dir: '', // empty -> default to <userData>/kbase
+      },
     },
     channels,
     connectors,

@@ -13,6 +13,30 @@ const existing = store.load();
 store.state = existing || buildSeed();
 if (!existing) store.save();
 
+// Attach the kbase LLM-Wiki backend. Default location: <userData>/kbase.
+const { KBase } = require('./kbase');
+const kbaseDir =
+  (store.state.settings && store.state.settings.kbase && store.state.settings.kbase.dir) ||
+  path.join(app.getPath('userData'), 'kbase');
+const kbase = new KBase(kbaseDir);
+store.kbase = kbase;
+// Backfill existing inspirations into the knowledge base on first run.
+if (kbase.count() === 0 && (store.state.inbox || []).length) {
+  for (const it of store.state.inbox) {
+    try {
+      kbase.add({
+        title: it.title,
+        content: it.content,
+        channel: (store.state.channels.find((c) => c.id === it.channelId) || {}).name || '',
+        source: it.source,
+        author: it.author,
+      });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+}
+
 let mainWindow = null;
 const emit = () => {
   if (mainWindow) mainWindow.webContents.send('vibe:state', store.getState());
@@ -64,6 +88,17 @@ const handlers = {
     const dir = (g && g.projectDir) || path.join(projectsDir, a.goalId);
     try {
       shell.openPath(dir);
+    } catch (e) {
+      /* ignore */
+    }
+    return store.getState();
+  },
+  kbaseSearch: (a) => store.kbaseSearch(a.query, a.topK),
+  kbaseList: () => store.kbaseList(),
+  kbaseStats: () => store.kbaseStats(),
+  kbaseOpen: () => {
+    try {
+      shell.openPath(kbase.root);
     } catch (e) {
       /* ignore */
     }

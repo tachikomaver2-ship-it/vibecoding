@@ -21,6 +21,7 @@ class Store {
   constructor(dataPath) {
     this.dataPath = dataPath;
     this.state = null;
+    this.kbase = null; // KBase instance (set by main.js / server.cjs)
   }
 
   load() {
@@ -189,7 +190,19 @@ class Store {
       status: 'pending',
       linkedGoalId: null,
       reviewedAt: null,
+      kbId: null,
     };
+    // Sync the inspiration into the kbase LLM-Wiki backend (raw/ + wiki/).
+    if (this.kbase) {
+      try {
+        const channelName =
+          (this.state.channels.find((c) => c.id === channelId) || {}).name || channelId || '';
+        const doc = this.kbase.add({ title, content, channel: channelName, source, author });
+        item.kbId = doc.id;
+      } catch (e) {
+        /* never block the inbox on a KB write failure */
+      }
+    }
     this.state.inbox.unshift(item);
     return this.state;
   }
@@ -201,6 +214,13 @@ class Store {
     item.reviewedAt = now();
     if (decision === 'approve') {
       item.status = 'approved';
+      if (this.kbase && item.kbId) {
+        try {
+          this.kbase.markAdopted(item.kbId, true);
+        } catch (e) {
+          /* non-fatal */
+        }
+      }
       if (opts.createGoal !== false) {
         const goal = {
           id: uid('g'),
@@ -287,6 +307,11 @@ class Store {
     const inspirations = (g.sourceIds || [])
       .map((id) => this.state.inbox.find((i) => i.id === id))
       .filter(Boolean);
+    // Pull related knowledge from the kbase LLM-Wiki so the coding agent can
+    // ground the generated project in prior inspirations / notes.
+    const related = this.kbase
+      ? this.kbase.search(g.title + ' ' + (g.description || ''), 5)
+      : [];
     const userOnLog = opts.onLog;
     const onLog = (m) => {
       g.agentLog.push(m);
@@ -296,6 +321,7 @@ class Store {
     const result = await generate(g, this.state.settings, {
       projectsDir: opts.projectsDir,
       inspirations,
+      related,
       onLog,
     });
     if (g.stage === 'requirement') this.advanceStage(goalId);
@@ -344,6 +370,34 @@ class Store {
           source: 'github',
           author: it.author || repo,
         });
+      }
+    }
+    return this.state;
+  }
+
+  // ---- kbase (LLM-Wiki) integration -----------------------------------------
+
+  kbaseSearch(query, topK = 5) {
+    if (!this.kbase) return [];
+    return this.kbase.search(query, topK);
+  }
+
+  kbaseList() {
+    if (!this.kbase) return [];
+    return this.kbase.list();
+  }
+
+  kbaseStats() {
+    if (!this.kbase) return { enabled: false, docs: 0, dir: '' };
+    return this.kbase.stats();
+  }
+
+  kbaseOpen() {
+    if (this.kbase) {
+      try {
+        require('child_process').exec(`open "${this.kbase.root}"`);
+      } catch (e) {
+        /* non-fatal */
       }
     }
     return this.state;

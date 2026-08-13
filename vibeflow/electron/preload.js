@@ -21,6 +21,10 @@ const names = [
   'importFromGithub',
   'vibeCode',
   'vibeScaffold',
+  'kbaseSearch',
+  'kbaseList',
+  'kbaseStats',
+  'kbaseOpen',
 ];
 
 const api = {};

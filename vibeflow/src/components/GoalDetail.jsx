@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { stageMeta, formatDateTime, timeAgo } from '../lib/format.js';
 import { ProgressBar } from './ProgressBar.jsx';
 import * as api from '../api.js';
@@ -14,6 +14,15 @@ export function GoalDetail({ goal, state, onClose, refresh, notify }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [setupErr, setSetupErr] = useState(null);
+  const [related, setRelated] = useState([]);
+
+  useEffect(() => {
+    setRelated([]);
+    api
+      .kbaseSearch({ query: goal.title + ' ' + (goal.description || ''), topK: 3 })
+      .then(setRelated)
+      .catch(() => {});
+  }, [goal.id]);
 
   const sources = (goal.sourceIds || [])
     .map((id) => state.inbox.find((i) => i.id === id))
@@ -218,6 +227,20 @@ export function GoalDetail({ goal, state, onClose, refresh, notify }) {
                 <div className="source-item" key={s.id}>
                   <div className="source-title">💡 {s.title}</div>
                   <div className="muted">{s.content}</div>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {related.length > 0 && (
+            <section className="panel">
+              <div className="panel-head">
+                <span>相关知识点（知识库 · kbase）</span>
+              </div>
+              {related.map((r) => (
+                <div className="source-item" key={r.id}>
+                  <div className="source-title">🔎 {r.title}</div>
+                  <div className="muted">{r.snippet}</div>
                 </div>
               ))}
             </section>

@@ -76,7 +76,7 @@ function findAgent(command) {
   }
 }
 
-function buildPrompt(goal, inspirations) {
+function buildPrompt(goal, inspirations, related) {
   const L = [];
   L.push(`# 产品目标：${goal.title}`);
   if (goal.description) L.push(`\n## 需求描述\n${goal.description}`);
@@ -88,6 +88,12 @@ function buildPrompt(goal, inspirations) {
   if (inspirations && inspirations.length) {
     L.push('\n## 参考灵感（来自知识库）');
     for (const s of inspirations) L.push(`- ${s.title}：${s.content}`);
+  }
+  if (related && related.length) {
+    L.push('\n## 相关知识库（kbase · 已沉淀的知识点，供借鉴）');
+    for (const r of related) {
+      L.push(`- 《${r.title}》：${r.snippet || ''}`);
+    }
   }
   L.push('\n## 任务');
   L.push('请基于以上需求，生成一个可直接运行的最小可行项目，包含完整的源码文件与一个 README.md。');
@@ -127,7 +133,7 @@ function runLocalAgent(goal, settings, opts) {
       '--no-auto-commits',
       '--no-git',
       '--yes',
-      '-m', buildPrompt(goal, opts.inspirations),
+      '-m', buildPrompt(goal, opts.inspirations, opts.related),
     ];
 
     const child = spawn(command, args, { cwd: projectDir, env: process.env });

@@ -24,6 +24,29 @@ if (!existing) {
   store.save();
 }
 
+// Attach the kbase LLM-Wiki backend. Default location: <dataDir>/kbase.
+const { KBase } = require('./electron/kbase');
+const kbaseDir =
+  (store.state.settings && store.state.settings.kbase && store.state.settings.kbase.dir) ||
+  path.join(dataDir, 'kbase');
+const kbase = new KBase(kbaseDir);
+store.kbase = kbase;
+if (kbase.count() === 0 && (store.state.inbox || []).length) {
+  for (const it of store.state.inbox) {
+    try {
+      kbase.add({
+        title: it.title,
+        content: it.content,
+        channel: (store.state.channels.find((c) => c.id === it.channelId) || {}).name || '',
+        source: it.source,
+        author: it.author,
+      });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+}
+
 function sendJson(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(obj));
@@ -65,6 +88,13 @@ const syncHandlers = {
     const g = store.state.goals.find((x) => x.id === a.goalId);
     const dir = (g && g.projectDir) || path.join(projectsDir, a.goalId);
     if (process.platform === 'darwin') require('child_process').exec(`open "${dir}"`);
+    return store.getState();
+  },
+  kbaseSearch: (a) => store.kbaseSearch(a.query, a.topK),
+  kbaseList: () => store.kbaseList(),
+  kbaseStats: () => store.kbaseStats(),
+  kbaseOpen: () => {
+    if (process.platform === 'darwin') require('child_process').exec(`open "${kbase.root}"`);
     return store.getState();
   },
 };

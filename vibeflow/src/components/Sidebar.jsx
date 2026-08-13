@@ -1,6 +1,7 @@
 const VIEWS = [
   { id: 'board', label: '📋 目标看板', icon: '📋' },
   { id: 'inbox', label: '📥 灵感收件箱', icon: '📥' },
+  { id: 'kbase', label: '📚 知识库', icon: '📚' },
   { id: 'connectors', label: '🔌 连接器', icon: '🔌' },
   { id: 'activity', label: '⚡ 动态', icon: '⚡' },
 ];

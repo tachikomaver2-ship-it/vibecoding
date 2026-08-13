@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { timeAgo } from '../lib/format.js';
 import * as api from '../api.js';
 
-export function Inbox({ state, activeChannel, refresh, notify }) {
+export function Inbox({ state, activeChannel, refresh, notify, onOpenKb }) {
   const channels = state.channels || [];
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -33,7 +33,9 @@ export function Inbox({ state, activeChannel, refresh, notify }) {
     setContent('');
     call(() =>
       api.addInboxItem({ channelId: channelId || channels[0]?.id, title: t, content, source })
-    );
+    ).then((r) => {
+      if (r) notify('灵感已写入知识库（kbase LLM-Wiki）');
+    });
   };
   const review = (id, decision) =>
     call(() => api.reviewInboxItem({ id, decision, opts: {} }));
@@ -93,6 +95,12 @@ export function Inbox({ state, activeChannel, refresh, notify }) {
             <button className="btn primary" onClick={addItem}>
               添加到知识库
             </button>
+            <button className="btn sm" onClick={onOpenKb}>
+              📚 查看知识库
+            </button>
+            <p className="muted small">
+              灵感会同步沉淀到本地 <b>kbase</b> 知识库（<code>raw/</code> + <code>wiki/</code> 结构，可被语义检索，不依赖外部服务）。
+            </p>
           </div>
 
           <div className="panel-head" style={{ marginTop: 16 }}>
@@ -149,6 +157,7 @@ export function Inbox({ state, activeChannel, refresh, notify }) {
                   {channels.find((c) => c.id === it.channelId)?.name || '—'} · {it.source} ·{' '}
                   {it.author} · {timeAgo(it.createdAt)}
                   {it.linkedGoalId ? ' · 已生成目标' : ''}
+                  {it.kbId ? ' · 📚已入库' : ''}
                 </div>
                 {it.status === 'pending' && (
                   <div className="inbox-actions">

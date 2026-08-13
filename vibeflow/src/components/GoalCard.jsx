@@ -7,10 +7,17 @@ export function GoalCard({ goal, sources, onOpen }) {
   const done = tasks.filter((t) => t.done).length;
   const pending = goal.stage === 'idea' && !goal.reviewedBy;
 
+  const onDragStart = (e) => {
+    e.dataTransfer.setData('text/goal-id', goal.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <div
       className="goal-card"
       style={{ borderLeftColor: meta.color }}
+      draggable
+      onDragStart={onDragStart}
       onClick={() => onOpen(goal.id)}
     >
       <div className="goal-card-top">

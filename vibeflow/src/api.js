@@ -23,6 +23,10 @@ const names = [
   'importFromGithub',
   'vibeCode',
   'vibeScaffold',
+  'kbaseSearch',
+  'kbaseList',
+  'kbaseStats',
+  'kbaseOpen',
 ];
 
 function makeHttpApi() {
@@ -110,3 +114,7 @@ export const runCodex = (a) => bridge.runCodex(a);
 export const importFromGithub = (a) => bridge.importFromGithub(a);
 export const vibeCode = (a) => bridge.vibeCode(a);
 export const vibeScaffold = (a) => bridge.vibeScaffold(a);
+export const kbaseSearch = (a) => bridge.kbaseSearch(a);
+export const kbaseList = (a) => bridge.kbaseList(a);
+export const kbaseStats = (a) => bridge.kbaseStats(a);
+export const kbaseOpen = (a) => bridge.kbaseOpen(a);

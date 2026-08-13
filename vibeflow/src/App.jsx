@@ -4,6 +4,7 @@ import { STAGES } from './lib/format.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { Board } from './components/Board.jsx';
 import { Inbox } from './components/Inbox.jsx';
+import { KnowledgeBase } from './components/KnowledgeBase.jsx';
 import { Connectors } from './components/Connectors.jsx';
 import { Activity } from './components/Activity.jsx';
 import { GoalDetail } from './components/GoalDetail.jsx';
@@ -11,6 +12,7 @@ import { GoalDetail } from './components/GoalDetail.jsx';
 const VIEW_TITLE = {
   board: '目标看板 · 开发阶段一览',
   inbox: '灵感收件箱 · 知识库沉淀',
+  kbase: '知识库 · kbase LLM-Wiki',
   connectors: '连接器 · 平台知识库接入',
   activity: '动态 · 全局活动时间线',
 };
@@ -22,6 +24,7 @@ export default function App() {
   const [activeChannel, setActiveChannel] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
   const [toast, setToast] = useState(null);
+  const [reviewGoalId, setReviewGoalId] = useState(null);
 
   useEffect(() => {
     api.getState().then(setState);
@@ -33,6 +36,25 @@ export default function App() {
   const notify = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2600);
+  };
+
+  // Board drag-and-drop: move a goal to a target stage. Moving out of 想法 still
+  // requires the human review gate, so we open a review modal instead of moving.
+  const moveGoal = async (goalId, toStage) => {
+    const g = state.goals.find((x) => x.id === goalId);
+    if (!g || g.stage === toStage) return;
+    const crossingGate = g.stage === 'idea' && STAGES.order.indexOf(toStage) > STAGES.order.indexOf('idea');
+    if (crossingGate) {
+      setReviewGoalId(goalId);
+      return;
+    }
+    try {
+      const r = await api.moveGoal({ id: goalId, toStage });
+      refresh(r);
+      notify('已移动到「' + STAGES.meta[toStage].label + '」');
+    } catch (e) {
+      notify('错误：' + e.message);
+    }
   };
 
   if (!state) return <div className="loading">加载中…</div>;
@@ -63,10 +85,11 @@ export default function App() {
         </header>
 
         <div className="content">
-          {view === 'board' && <Board state={state} onOpen={setSelectedGoalId} />}
+          {view === 'board' && <Board state={state} onOpen={setSelectedGoalId} onMoveGoal={moveGoal} />}
           {view === 'inbox' && (
-            <Inbox state={state} activeChannel={activeChannel} refresh={refresh} notify={notify} />
+            <Inbox state={state} activeChannel={activeChannel} refresh={refresh} notify={notify} onOpenKb={() => setView('kbase')} />
           )}
+          {view === 'kbase' && <KnowledgeBase state={state} refresh={refresh} notify={notify} />}
           {view === 'connectors' && <Connectors state={state} refresh={refresh} notify={notify} />}
           {view === 'activity' && <Activity state={state} />}
         </div>
@@ -98,6 +121,15 @@ export default function App() {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+
+      {reviewGoalId && (
+        <BoardReviewModal
+          goal={state.goals.find((g) => g.id === reviewGoalId)}
+          onClose={() => setReviewGoalId(null)}
+          refresh={refresh}
+          notify={notify}
+        />
+      )}
     </div>
   );
 }
@@ -166,6 +198,53 @@ function CreateModal({ state, onClose, refresh, notify, onCreated }) {
           </button>
           <button className="btn primary" onClick={create}>
             创建
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BoardReviewModal({ goal, onClose, refresh, notify }) {
+  const [reviewer, setReviewer] = useState('我');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!goal) return null;
+  const targetStage = STAGES.order[STAGES.order.indexOf(goal.stage) + 1] || 'requirement';
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const r = await api.moveGoal({ id: goal.id, toStage: targetStage, review: { reviewer, note } });
+      refresh(r);
+      notify('审核通过，已推进到「' + STAGES.meta[targetStage].label + '」');
+      onClose();
+    } catch (e) {
+      notify('错误：' + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>人工审核：{STAGES.meta[goal.stage].label} → {STAGES.meta[targetStage].label}</h3>
+        <p className="muted">拖拽移动触发门禁：想法阶段的灵感需经人工审核通过，才能进入需求阶段。</p>
+        <label>审核人</label>
+        <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
+        <label>审核意见</label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="例如：需求清晰，可进入开发"
+        />
+        <div className="modal-actions">
+          <button className="btn" onClick={onClose}>
+            取消
+          </button>
+          <button className="btn primary" onClick={submit} disabled={busy}>
+            通过审核并移动
           </button>
         </div>
       </div>

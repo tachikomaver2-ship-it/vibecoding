@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from '../api.js';
 
 const TYPE_HINT = {
@@ -11,6 +11,11 @@ const TYPE_HINT = {
 
 export function Connectors({ state, refresh, notify }) {
   const [settings, setSettings] = useState(state.settings || {});
+  const [kb, setKb] = useState(null);
+
+  useEffect(() => {
+    api.kbaseStats().then(setKb).catch(() => {});
+  }, []);
 
   async function call(fn) {
     try {
@@ -82,6 +87,31 @@ export function Connectors({ state, refresh, notify }) {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <span>📚 知识库后端（kbase · LLM-Wiki）</span>
+        </div>
+        <p className="muted small">
+          所有灵感（手动 / 文件 / Webhook / GitHub / Slack）自动沉淀到本地 <b>kbase</b> 知识库：以 markdown
+          落盘到 <code>raw/</code> + <code>wiki/</code>，并用本地 BM25 索引做语义检索，<b>完全离线、不依赖任何外部服务</b>。
+          该目录与开源 kbase（gitee.com/dxdbc/kbase）兼容，可被其 MCP Server 直接读取。
+        </p>
+        {kb && (
+          <div className="kbase-stat">
+            <span className={'status-badge ' + (kb.enabled ? 'approved' : 'pending')}>
+              {kb.enabled ? '已启用' : '未启用'}
+            </span>
+            <span className="muted small">共 {kb.docs} 篇知识</span>
+          </div>
+        )}
+        <button
+          className="btn sm"
+          onClick={() => api.kbaseOpen().catch((e) => notify('错误：' + e.message))}
+        >
+          打开知识库目录
+        </button>
       </section>
 
       <section className="panel">
