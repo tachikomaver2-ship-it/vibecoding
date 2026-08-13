@@ -1,0 +1,30 @@
+{
+  "name": "vibeflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vibe coding board that fuses Codex (AI coding agent) + Slack (channels/knowledge base). Track goals across Idea → Requirement → Dev → Test → Deploy with progress bars, history, and a connector-driven knowledge inbox.",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "electron .",
+    "dev": "node scripts/dev.mjs",
+    "dist": "vite build && electron-builder"
+  },
+  "author": "tachikomaver2-ship-it",
+  "license": "MIT",
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^31.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.11"
+  },
+  "optionalDependencies": {
+    "electron-builder": "^24.13.3"
+  }
+}

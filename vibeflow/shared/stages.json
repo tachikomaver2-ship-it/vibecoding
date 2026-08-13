@@ -1,0 +1,42 @@
+{
+  "order": ["idea", "requirement", "dev", "test", "deploy"],
+  "meta": {
+    "idea": {
+      "label": "想法",
+      "labelEn": "Idea",
+      "color": "#8b5cf6",
+      "description": "产品灵感与初步设想，沉淀自各平台连接器知识库，待人工审核。"
+    },
+    "requirement": {
+      "label": "需求",
+      "labelEn": "Requirement",
+      "color": "#3b82f6",
+      "description": "经人工审核确认的需求，明确目标、范围与验收标准。"
+    },
+    "dev": {
+      "label": "开发",
+      "labelEn": "Development",
+      "color": "#f59e0b",
+      "description": "编码实现中，可由 Codex 类 AI 代理推进。"
+    },
+    "test": {
+      "label": "测试",
+      "labelEn": "Testing",
+      "color": "#0ea5e9",
+      "description": "功能验证、质量门禁与回归测试。"
+    },
+    "deploy": {
+      "label": "部署上线",
+      "labelEn": "Deployed",
+      "color": "#22c55e",
+      "description": "已发布上线，进入持续运营阶段。"
+    }
+  },
+  "baseline": {
+    "idea": 8,
+    "requirement": 28,
+    "dev": 52,
+    "test": 78,
+    "deploy": 100
+  }
+}
