@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const { Store } = require('./store');
 const { buildSeed } = require('./seed');
@@ -7,6 +7,7 @@ const { startWebhook } = require('./webhook');
 if (require('electron-squirrel-startup')) app.quit();
 
 const dataPath = path.join(app.getPath('userData'), 'vibeflow-data.json');
+const projectsDir = path.join(app.getPath('userData'), 'projects');
 const store = new Store(dataPath);
 const existing = store.load();
 store.state = existing || buildSeed();
@@ -57,6 +58,17 @@ const handlers = {
   updateConnector: (a) => store.updateConnector(a.id, a.patch),
   setSettings: (a) => store.setSettings(a.patch),
   importFromFile: (a) => store.importFromFile(a.channelId, a.text, a.filename),
+  moveGoal: (a) => store.moveGoal(a.id, a.toStage, a.review),
+  openProjectDir: (a) => {
+    const g = store.state.goals.find((x) => x.id === a.goalId);
+    const dir = (g && g.projectDir) || path.join(projectsDir, a.goalId);
+    try {
+      shell.openPath(dir);
+    } catch (e) {
+      /* ignore */
+    }
+    return store.getState();
+  },
 };
 
 for (const [name, fn] of Object.entries(handlers)) {
@@ -71,6 +83,26 @@ for (const [name, fn] of Object.entries(handlers)) {
 // Async handlers.
 ipcMain.handle('vibe:runCodex', async (_e, a) => {
   const r = await store.runCodex(a.goalId, a.mode);
+  store.save();
+  emit();
+  return r;
+});
+
+ipcMain.handle('vibe:vibeCode', async (_e, a) => {
+  const g = store.state.goals.find((x) => x.id === a.goalId);
+  const r = await store.vibeCode(a.goalId, {
+    projectsDir,
+    onLog: () => {
+      if (g) emit();
+    },
+  });
+  store.save();
+  emit();
+  return r;
+});
+
+ipcMain.handle('vibe:vibeScaffold', async (_e, a) => {
+  const r = await store.vibeScaffold(a.goalId, { projectsDir });
   store.save();
   emit();
   return r;

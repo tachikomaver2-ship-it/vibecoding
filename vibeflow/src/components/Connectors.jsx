@@ -30,6 +30,11 @@ export function Connectors({ state, refresh, notify }) {
     );
 
   const webhookPort = (state.settings && state.settings.webhookPort) || 18720;
+  const agent = state.settings?.agent || {};
+  const saveAgent = (key, val) =>
+    call(() =>
+      api.setSettings({ patch: { agent: { ...agent, [key]: val } } })
+    ).then(() => setSettings((s) => ({ ...s, agent: { ...agent, [key]: val } })));
 
   return (
     <div className="connectors">
@@ -81,22 +86,61 @@ export function Connectors({ state, refresh, notify }) {
 
       <section className="panel">
         <div className="panel-head">
-          <span>Codex / AI 代理设置</span>
+          <span>⚡ Vibe Coding 引擎（本地·开源）</span>
         </div>
+        <p className="muted small">
+          默认使用 <b>Aider</b>（开源 coding agent，github.com/Aider-AI/aider）+ 本地模型，完全离线运行。可选开启云端兼容接口。
+        </p>
         <div className="form">
-          <label>API Key（OpenAI 兼容，留空则使用离线建议）</label>
+          <label>引擎命令</label>
           <input
-            type="password"
-            value={settings.codexApiKey || ''}
-            onChange={(e) => saveSetting('codexApiKey', e.target.value)}
-            placeholder="sk-..."
+            value={agent.command || 'aider'}
+            onChange={(e) => saveAgent('command', e.target.value)}
+            placeholder="aider"
           />
-          <label>模型</label>
+          <label>本地模型（Ollama）</label>
           <input
-            value={settings.codexModel || 'gpt-4o-mini'}
-            onChange={(e) => saveSetting('codexModel', e.target.value)}
+            value={agent.model || 'ollama/qwen2.5-coder:latest'}
+            onChange={(e) => saveAgent('model', e.target.value)}
+            placeholder="ollama/qwen2.5-coder:latest"
           />
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <span>云端兼容接口（可选）</span>
+        </div>
+        <label className="switch-row">
+          <input
+            type="checkbox"
+            checked={!!agent.cloud?.enabled}
+            onChange={(e) => saveAgent('cloud', { ...(agent.cloud || {}), enabled: e.target.checked })}
+          />
+          <span>启用云端模型（默认关闭；开启后将依赖外部服务）</span>
+        </label>
+        {agent.cloud?.enabled && (
+          <div className="form">
+            <label>Base URL</label>
+            <input
+              value={agent.cloud?.baseURL || ''}
+              onChange={(e) => saveAgent('cloud', { ...(agent.cloud || {}), baseURL: e.target.value })}
+              placeholder="https://api.openai.com/v1"
+            />
+            <label>API Key</label>
+            <input
+              type="password"
+              value={agent.cloud?.apiKey || ''}
+              onChange={(e) => saveAgent('cloud', { ...(agent.cloud || {}), apiKey: e.target.value })}
+              placeholder="sk-..."
+            />
+            <label>模型</label>
+            <input
+              value={agent.cloud?.model || 'gpt-4o-mini'}
+              onChange={(e) => saveAgent('cloud', { ...(agent.cloud || {}), model: e.target.value })}
+            />
+          </div>
+        )}
       </section>
 
       <section className="panel">

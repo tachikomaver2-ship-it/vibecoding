@@ -164,7 +164,21 @@ function buildSeed() {
 
   return {
     version: 1,
-    settings: { codexApiKey: '', codexModel: 'gpt-4o-mini', webhookPort: 18720, webhookEnabled: true },
+    settings: {
+      agent: {
+        engine: 'aider',
+        command: 'aider',
+        model: 'ollama/qwen2.5-coder:latest',
+        cloud: {
+          enabled: false,
+          baseURL: 'https://api.openai.com/v1',
+          apiKey: '',
+          model: 'gpt-4o-mini',
+        },
+      },
+      webhookPort: 18720,
+      webhookEnabled: true,
+    },
     channels,
     connectors,
     inbox,

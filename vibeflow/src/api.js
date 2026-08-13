@@ -17,8 +17,12 @@ const names = [
   'updateConnector',
   'setSettings',
   'importFromFile',
+  'moveGoal',
+  'openProjectDir',
   'runCodex',
   'importFromGithub',
+  'vibeCode',
+  'vibeScaffold',
 ];
 
 function makeHttpApi() {
@@ -100,5 +104,9 @@ export const addChannel = (a) => bridge.addChannel(a);
 export const updateConnector = (a) => bridge.updateConnector(a);
 export const setSettings = (a) => bridge.setSettings(a);
 export const importFromFile = (a) => bridge.importFromFile(a);
+export const moveGoal = (a) => bridge.moveGoal(a);
+export const openProjectDir = (a) => bridge.openProjectDir(a);
 export const runCodex = (a) => bridge.runCodex(a);
 export const importFromGithub = (a) => bridge.importFromGithub(a);
+export const vibeCode = (a) => bridge.vibeCode(a);
+export const vibeScaffold = (a) => bridge.vibeScaffold(a);

@@ -15,8 +15,12 @@ const names = [
   'updateConnector',
   'setSettings',
   'importFromFile',
+  'moveGoal',
+  'openProjectDir',
   'runCodex',
   'importFromGithub',
+  'vibeCode',
+  'vibeScaffold',
 ];
 
 const api = {};

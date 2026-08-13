@@ -13,6 +13,7 @@ export function GoalDetail({ goal, state, onClose, refresh, notify }) {
   const [reviewer, setReviewer] = useState('我');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [setupErr, setSetupErr] = useState(null);
 
   const sources = (goal.sourceIds || [])
     .map((id) => state.inbox.find((i) => i.id === id))
@@ -50,6 +51,33 @@ export function GoalDetail({ goal, state, onClose, refresh, notify }) {
       setShowReview(false)
     );
   const codex = (mode) => call(() => api.runCodex({ goalId: goal.id, mode }));
+  const openDir = () => call(() => api.openProjectDir({ goalId: goal.id }));
+  const vibe = async () => {
+    setSetupErr(null);
+    setBusy(true);
+    try {
+      const r = await api.vibeCode({ goalId: goal.id });
+      refresh(r);
+    } catch (e) {
+      setSetupErr(e.message);
+      notify('Vibe Coding 引擎未就绪，请按提示安装');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const scaffold = async () => {
+    setSetupErr(null);
+    setBusy(true);
+    try {
+      const r = await api.vibeScaffold({ goalId: goal.id });
+      refresh(r);
+      notify('离线脚手架已生成');
+    } catch (e) {
+      notify('错误：' + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const del = () => {
     if (!window.confirm('确认删除该目标？此操作不可撤销。')) return;
     call(() => api.deleteGoal({ id: goal.id })).then(() => onClose());
@@ -123,6 +151,42 @@ export function GoalDetail({ goal, state, onClose, refresh, notify }) {
                 添加
               </button>
             </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-head">
+              <span>⚡ Vibe Coding（本地·开源引擎）</span>
+              <button className="link-btn" onClick={openDir} disabled={busy || !goal.projectDir}>
+                打开目录
+              </button>
+            </div>
+            <p className="muted small">
+              基于「需求」阶段的标题 / 描述 / 任务 / 灵感，调用本地开源 coding agent（Aider + 本地模型）生成可运行项目，
+              <b>不依赖任何外部服务</b>。引擎需在「连接器 / Vibe Coding 引擎」中配置。
+            </p>
+            <div className="vibe-actions">
+              <button className="btn primary" onClick={vibe} disabled={busy || isIdea}>
+                ⚡ 用 Aider 本地生成代码
+              </button>
+              <button className="btn" onClick={scaffold} disabled={busy || isIdea}>
+                📦 离线脚手架（无 LLM）
+              </button>
+            </div>
+            {isIdea && <p className="muted small">需先推进到「需求」阶段。</p>}
+            {(goal.agentLog || []).length > 0 && (
+              <pre className="agent-log">{goal.agentLog.join('\n')}</pre>
+            )}
+            {setupErr && <pre className="agent-error">{setupErr}</pre>}
+            {(goal.generatedFiles || []).length > 0 && (
+              <div className="gen-files">
+                <div className="muted small">生成文件（{goal.generatedFiles.length}）</div>
+                {goal.generatedFiles.map((f, i) => (
+                  <div className="file-row" key={i}>
+                    📄 {f.path}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="panel">

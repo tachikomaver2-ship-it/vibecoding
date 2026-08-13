@@ -58,7 +58,8 @@ npm start
 - **阶段操作**：
   - 想法阶段 → 必须「提交审核」（填审核人 + 意见）才能进入需求；
   - 需求 / 开发 / 测试 → 一键「推进到下一阶段」；
-  - 「🤖 Codex 规划 / 生成任务」：调用 AI 代理自动产出任务并写入历史。
+  - 「🤖 Codex 规划 / 生成任务」：离线启发式代理自动产出任务并写入历史（不依赖外部）。
+  - 「⚡ Vibe Coding」：调用本地开源引擎（Aider + 本地模型）根据需求生成可运行代码；「📦 离线脚手架」为无 LLM 的模板回退。
 
 ### 3. 灵感收件箱（连接器知识库）
 - 手动添加灵感（标题 / 内容 / 来源 / 频道）。
@@ -76,9 +77,29 @@ npm start
   ```
 - **GitHub Issues / Slack**：配置仓库或 webhook 地址后启用。
 
-### 5. Codex / AI 代理
-- 在连接器页填入 OpenAI 兼容的 API Key 与模型（默认 `gpt-4o-mini`）。
-- 未填 Key 时自动回退到**离线启发式规划**，保证无网络也能用。
+### 5. ⚡ Vibe Coding 引擎（本地·开源，**不依赖外部**）
+点击目标详情里的「⚡ 用 Aider 本地生成代码」，会根据该目标的**需求（标题 / 描述 / 任务 / 灵感）**调用本地开源 coding agent **Aider**（[github.com/Aider-AI/aider](https://github.com/Aider-AI/aider)，MIT 协议）生成可运行项目，写入 `projects/<goalId>/`，并自动从「需求」推进到「开发」阶段。
+
+- **默认完全离线**：Aider 后端用本地模型（如 Ollama 跑 `qwen2.5-coder`），全程不调用任何外部服务。
+- **零依赖回退**：「📦 离线脚手架」用内置模板立即生成基础项目（无 LLM）。
+- **可选云端**：连接器页「云端兼容接口」默认关闭；仅当你主动开启并填入 Key 时才走 OpenAI 兼容接口。
+
+#### 本地引擎一次性安装
+```bash
+# 1. 安装 Aider（开源 coding agent）
+pip install aider-chat
+
+# 2. 安装并启动本地模型（以 Ollama 为例）
+brew install ollama
+ollama pull qwen2.5-coder        # 或 deepseek-coder / codellama
+ollama serve                      # 默认监听 11434
+
+# 3. 在 VibeFlow「连接器 → Vibe Coding 引擎」中确认命令(aider)与模型(ollama/qwen2.5-coder:latest)
+```
+> 引擎命令 / 模型都可在「连接器」页修改；若检测到命令不存在，详情页会直接给出上述安装提示。
+
+### 6. 拖拽流转
+看板卡片可直接拖到任意阶段列；从「想法」拖出仍会触发**人工审核门禁**（弹窗填审核人），其余方向直接移动。
 
 ---
 
@@ -91,7 +112,8 @@ vibeflow/
 │   ├── preload.js     # contextBridge 安全暴露 window.vibeAPI
 │   ├── store.js       # 状态模型 / 持久化 / 进度与历史逻辑
 │   ├── seed.js        # 首次启动的示例数据
-│   ├── codex.js       # Codex 风格 AI 代理（OpenAI 兼容 + 离线回退）
+│   ├── vibecode.js    # Vibe Coding 引擎（默认本地 Aider + 本地模型，可选云端回退）
+│   ├── codex.js       # 离线启发式任务规划（不依赖外部）
 │   ├── github.js      # 通过 gh CLI 拉取 Issue
 │   └── webhook.js     # 本地 Webhook 接收服务
 ├── shared/
@@ -123,7 +145,6 @@ vibeflow/
 ---
 
 ## 后续可扩展
-- 拖拽卡片跨阶段流转（目前用按钮推进，已预留审核门禁）。
 - 多人实时协作（Slack 风格的频道消息流可升级为实时同步）。
-- 接入真实 Codex CLI / Claude Code 执行代码生成与 PR 创建。
 - 目标与 Git 仓库 / Issue 双向联动（借鉴 Aider 的 git 原生能力）。
+- 在容器内接入 OpenHands / Cline 作为可切换的编码引擎后端。

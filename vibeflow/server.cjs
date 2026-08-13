@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 8787;
 const distDir = path.join(__dirname, 'dist');
 const dataDir = path.join(__dirname, '.vibeflow-data');
 const dataPath = path.join(dataDir, 'vibeflow-data.json');
+const projectsDir = path.join(__dirname, 'projects');
 
 const store = new Store(dataPath);
 const existing = store.load();
@@ -59,10 +60,30 @@ const syncHandlers = {
   updateConnector: (a) => store.updateConnector(a.id, a.patch),
   setSettings: (a) => store.setSettings(a.patch),
   importFromFile: (a) => store.importFromFile(a.channelId, a.text, a.filename),
+  moveGoal: (a) => store.moveGoal(a.id, a.toStage, a.review),
+  openProjectDir: (a) => {
+    const g = store.state.goals.find((x) => x.id === a.goalId);
+    const dir = (g && g.projectDir) || path.join(projectsDir, a.goalId);
+    if (process.platform === 'darwin') require('child_process').exec(`open "${dir}"`);
+    return store.getState();
+  },
 };
 
 async function handleAction(name, arg) {
   if (name === 'runCodex') return await store.runCodex(arg.goalId, arg.mode);
+  if (name === 'vibeCode') {
+    const g = store.state.goals.find((x) => x.id === arg.goalId);
+    return await store.vibeCode(arg.goalId, {
+      projectsDir,
+      onLog: (m) => {
+        if (g) {
+          g.agentLog = g.agentLog || [];
+          g.agentLog.push(m);
+        }
+      },
+    });
+  }
+  if (name === 'vibeScaffold') return await store.vibeScaffold(arg.goalId, { projectsDir });
   if (name === 'importFromGithub') return await store.importFromGithub(arg.repo, arg.channelId);
   const fn = syncHandlers[name];
   if (!fn) throw new Error('未知操作: ' + name);
