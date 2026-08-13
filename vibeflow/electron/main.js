@@ -1,5 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
+const http = require('http');
+const fs = require('fs');
 const { Store } = require('./store');
 const { buildSeed } = require('./seed');
 const { startWebhook } = require('./webhook');
@@ -38,9 +40,61 @@ if (kbase.count() === 0 && (store.state.inbox || []).length) {
 }
 
 let mainWindow = null;
+let staticUrl = null; // http URL serving dist/ in production (avoids file:// module CORS)
 const emit = () => {
   if (mainWindow) mainWindow.webContents.send('vibe:state', store.getState());
 };
+
+// Minimal static file server for the built dist/. Vite emits ES modules, which
+// Chromium refuses to load over file:// (opaque-origin CORS), so in production
+// we serve dist/ over http://127.0.0.1 and loadURL it instead of loadFile.
+const STATIC_MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
+const distDir = path.join(__dirname, '../dist');
+
+function startStaticServer() {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      let urlPath = decodeURIComponent(req.url.split('?')[0]);
+      if (urlPath === '/') urlPath = '/index.html';
+      const filePath = path.join(distDir, urlPath);
+      if (!filePath.startsWith(distDir)) {
+        res.writeHead(403);
+        return res.end('forbidden');
+      }
+      fs.readFile(filePath, (err, buf) => {
+        if (err) {
+          // SPA fallback to index.html
+          fs.readFile(path.join(distDir, 'index.html'), (e2, idx) => {
+            if (e2) {
+              res.writeHead(404);
+              return res.end('not found - run `npm run build` first');
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(idx);
+          });
+          return;
+        }
+        const ext = path.extname(filePath);
+        res.writeHead(200, { 'Content-Type': STATIC_MIME[ext] || 'application/octet-stream' });
+        res.end(buf);
+      });
+    });
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address();
+      resolve('http://127.0.0.1:' + port);
+    });
+    server.on('error', reject);
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -61,7 +115,11 @@ function createWindow() {
   if (dev) {
     mainWindow.loadURL(dev);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } else if (staticUrl) {
+    // Production: load over http so ES modules load without CORS errors.
+    mainWindow.loadURL(staticUrl);
   } else {
+    // Fallback if the static server could not start.
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 }
@@ -150,8 +208,20 @@ ipcMain.handle('vibe:importFromGithub', async (_e, a) => {
   return r;
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log('[vibeflow] main process ready, dataPath =', dataPath);
+  // Start the local static server for dist/ (production). If it fails we fall
+  // back to loadFile in createWindow().
+  try {
+    if (!fs.existsSync(path.join(distDir, 'index.html'))) {
+      console.warn('[vibeflow] dist/index.html missing - run `npm run build` first');
+    }
+    staticUrl = await startStaticServer();
+    console.log('[vibeflow] static server for dist/ at', staticUrl);
+  } catch (e) {
+    console.error('[vibeflow] static server failed, falling back to loadFile:', e.message);
+    staticUrl = null;
+  }
   createWindow();
   console.log('[vibeflow] main window created');
   if (store.state.settings && store.state.settings.webhookEnabled) {
