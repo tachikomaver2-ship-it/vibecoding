@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentloop-harness-sdk"
+version = "1.0.0"
+description = "AgentLoop Harness 上报与回放 SDK：把本地 Agent 的 trace/metrics/logs 录成可回放的测评案例"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+harness = "harness.cli:main"
+
+[tool.setuptools]
+packages = ["harness"]

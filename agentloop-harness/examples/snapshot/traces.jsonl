@@ -1,0 +1,5 @@
+{"name": "gateway-5xx-ratio-up", "entity": "frontend", "ts_ms": 1758891200000, "severity": "warn", "text": "网关 5xx 占比由 0.2% 升至 6.4%"}
+{"name": "checkout-latency-up", "entity": "prod-checkout-service-7d9f-x2k4", "ts_ms": 1758891205000, "severity": "critical", "text": "checkout p99 180ms → 3820ms"}
+{"name": "db-query-time-up", "entity": "prod-checkout-db:3306", "ts_ms": 1758891210000, "severity": "error", "text": "数据库平均查询耗时 12ms → 1740ms"}
+{"name": "slow-sql-found", "entity": "prod-checkout-db:3306", "ts_ms": 1758891215000, "severity": "error", "text": "定位到 orders 表全表扫描，缺少 user_id 复合索引"}
+{"name": "connection-pool-saturated", "entity": "prod-checkout-service-7d9f-x2k4", "ts_ms": 1758891225000, "severity": "error", "text": "连接池 100/100 占用，37 个请求排队"}

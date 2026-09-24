@@ -1,0 +1,34 @@
+# ---- 运行时数据（含用户、Token、案例，禁止入库）----
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 本地配置 / 密钥 ----
+.env
+.env.*
+*.local.json
+agentloop-harness.json
+
+# ---- 编辑器 / 系统 ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ---- 运行时日志 ----
+*.log
+logs/

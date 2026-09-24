@@ -1,0 +1,5 @@
+{"entity": "prod-checkout-db:3306", "entity_type": "middleware", "severity": "error", "ts_ms": 1758891205000, "message": "[ERROR] slow query: SELECT * FROM orders WHERE user_id = 88123 AND status = 'PAID' ORDER BY created_at DESC LIMIT 20 -- took 3721ms"}
+{"entity": "prod-checkout-db:3306", "entity_type": "middleware", "severity": "error", "ts_ms": 1758891215000, "message": "[ERROR] Lock wait timeout exceeded; try restarting transaction (innodb_row_lock_time=5210ms)"}
+{"entity": "prod-checkout-service-7d9f-x2k4", "entity_type": "service", "severity": "warn", "ts_ms": 1758891225000, "message": "[WARN] HikariPool-1 - Connection is not available, request timed out after 30000ms (total=100, active=94, idle=6, waiting=37)"}
+{"entity": "prod-checkout-service-7d9f-x2k4", "entity_type": "service", "severity": "error", "ts_ms": 1758891235000, "message": "[ERROR] POST /api/v1/checkout 500 in 38104ms (upstream db timeout)"}
+{"entity": "prod-mysql-orders-0", "entity_type": "k8s", "severity": "info", "ts_ms": 1758891245000, "message": "[INFO] slow_query_log: rows_examined=2841193 rows_sent=20 key_used=NONE"}

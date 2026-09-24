@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgentLoop Harness · 智能体回路试验台</title>
+<link rel="stylesheet" href="/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <div id="login-view" class="login-wrap">
+    <div class="login-card">
+      <div class="brand-lg">AgentLoop <span>Harness</span></div>
+      <p class="muted login-sub">线上故障快照录制 · 四层真值沉淀 · 可回放评测 · BadCase 驱动迭代</p>
+      <div class="tabs">
+        <button class="tab active" data-mode="login">登录</button>
+        <button class="tab" data-mode="register">注册</button>
+      </div>
+      <label>用户名</label>
+      <input id="login-user" value="admin" autocomplete="username" />
+      <label>密码</label>
+      <input id="login-pass" type="password" value="admin123" autocomplete="current-password" />
+      <button class="btn primary block" id="login-submit">进入控制台</button>
+      <p class="hint" id="login-hint">演示账号 admin / admin123</p>
+    </div>
+  </div>
+
+  <div id="shell" class="hidden">
+    <aside class="sidebar">
+      <div class="brand">AgentLoop <span>Harness</span></div>
+      <nav id="nav">
+        <a href="#/dashboard">总览大盘</a>
+        <a href="#/runs">运行记录</a>
+        <a href="#/cases">案例库</a>
+        <a href="#/replay">回放评测</a>
+        <a href="#/optimize">优化建议 <em id="nav-opt-badge" class="badge hidden">0</em></a>
+        <a href="#/entities">实体语义</a>
+        <a href="#/settings">接入与设置</a>
+      </nav>
+      <div class="side-foot">
+        <div id="user-chip" class="muted"></div>
+        <button class="btn ghost sm" id="logout">退出</button>
+      </div>
+    </aside>
+    <main class="content">
+      <header class="topbar">
+        <h1 id="page-title">总览大盘</h1>
+        <div class="topbar-actions" id="page-actions"></div>
+      </header>
+      <section id="page"></section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="modal" class="modal hidden"><div class="modal-box"><div id="modal-body"></div></div></div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

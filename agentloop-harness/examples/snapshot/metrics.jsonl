@@ -1,0 +1,7 @@
+{"name": "p99_latency_ms", "entity": "prod-checkout-service-7d9f-x2k4", "entity_type": "service", "value": 3820, "severity": "critical", "ts_ms": 1758891200000}
+{"name": "error_rate", "entity": "prod-checkout-service-7d9f-x2k4", "entity_type": "service", "value": 6.4, "severity": "warn", "ts_ms": 1758891210000}
+{"name": "db_conn_active", "entity": "prod-checkout-db:3306", "entity_type": "middleware", "value": 94, "severity": "error", "ts_ms": 1758891220000}
+{"name": "db_conn_max", "entity": "prod-checkout-db:3306", "entity_type": "middleware", "value": 100, "severity": "info", "ts_ms": 1758891220000}
+{"name": "innodb_row_lock_waits", "entity": "prod-checkout-db:3306", "entity_type": "middleware", "value": 47, "severity": "warn", "ts_ms": 1758891230000}
+{"name": "cpu_usage_percent", "entity": "prod-mysql-orders-0", "entity_type": "k8s", "value": 62, "severity": "info", "ts_ms": 1758891230000}
+{"name": "pod_restart_count", "entity": "prod-checkout-service-7d9f-x2k4", "entity_type": "k8s", "value": 0, "severity": "info", "ts_ms": 1758891240000}
