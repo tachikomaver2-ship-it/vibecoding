@@ -50,6 +50,20 @@ open http://127.0.0.1:8848
 ./run.sh --selfcheck     # 61 项离线断言，不启动服务
 ```
 
+### 常驻运行（崩溃自动重启 + 公网隧道）
+
+`./run.sh` 是前台进程，终端一关就停。要长期挂着用：
+
+```bash
+scripts/daemonctl.sh start    # server + cloudflared 隧道，双 fork 守护 + 崩溃 5s 自动重启
+scripts/daemonctl.sh status   # 状态 + 当前公网地址（也写在 data/public_url.txt）
+scripts/daemonctl.sh stop     # 全部停止
+```
+
+隧道用 Cloudflare Quick Tunnel（免账号），**每次重启会换域名**，以 `data/public_url.txt` 为准。
+要开机自启（重启电脑后也拉起），用 `scripts/launchd/` 里的模板，见其 README——与 daemonctl 二选一，别同时跑。
+
+
 ### 界面一览
 
 **总览大盘** —— 运行量与评分趋势、故障分布、三维雷达、最近 BadCase、待确认优化建议：
@@ -208,7 +222,13 @@ agentloop-harness/
 ├── web/                  # 单页控制台（原生 JS + ECharts，无需构建；含中英双语说明书）
 ├── scripts/
 │   ├── selfcheck.py      # 61 项离线自检（不依赖 Web 框架）
-│   └── smoke_api.py      # 51 项端到端 HTTP 冒烟测试
+│   ├── smoke_api.py      # 51 项端到端 HTTP 冒烟测试
+│   ├── daemonctl.sh      # 常驻服务管理（start/stop/restart/status）
+│   ├── supervise.sh      # 崩溃自动重启监督器（launchd KeepAlive 的脚本版）
+│   ├── serve.sh          # 服务入口（launchd/守护方式调用）
+│   ├── tunnel.sh         # cloudflared 隧道入口，公网地址写入 data/public_url.txt
+│   ├── _daemonize.py     # 双 fork 守护化启动器（macOS 无 setsid(1)）
+│   └── launchd/          # 开机自启模板（可选，见其 README）
 ├── examples/
 │   ├── local_agent.py    # 示例：可被 live 回放的本地 Agent 服务
 │   ├── sdk_demo.py       # 示例：用 SDK 上报一次故障排查
