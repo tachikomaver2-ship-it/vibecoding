@@ -50,6 +50,24 @@ open http://127.0.0.1:8848
 ./run.sh --selfcheck     # 35 项离线断言，不启动服务
 ```
 
+### 界面一览
+
+**总览大盘** —— 运行量与评分趋势、故障分布、三维雷达、最近 BadCase、待确认优化建议：
+
+![总览大盘](docs/screenshots/dashboard.png)
+
+**案例详情** —— 四层真值标注（每层都标了权重）、GSTO 门禁、回放历史与 Δ、评分依据逐条可复算：
+
+![案例详情](docs/screenshots/case-detail.png)
+
+**优化建议** —— BadCase 聚类 + 带统一 diff 的可评审补丁，确认后一键提 PR：
+
+![优化建议](docs/screenshots/optimize.png)
+
+**实体语义** —— 归一化实体拓扑（力导向图）、跨域命名口径对照、故障分类树：
+
+![实体语义](docs/screenshots/entities.png)
+
 ### 接一个自己的 Agent
 
 ```bash
@@ -184,7 +202,7 @@ agentloop-harness/
 │   ├── local_agent.py    # 示例：可被 live 回放的本地 Agent 服务
 │   ├── sdk_demo.py       # 示例：用 SDK 上报一次故障排查
 │   └── snapshot/         # 示例：trace/metrics/logs 快照文件
-├── docs/                 # 架构 / 真值与打分 / 部署 / API
+├── docs/                 # 架构 / 真值与打分 / 部署 / API + screenshots/
 ├── run.sh                # 一键启动
 └── requirements.txt
 ```
@@ -205,6 +223,7 @@ agentloop-harness/
 | `scripts/selfcheck.py`（离线，零 Web 依赖） | **35 / 35 通过** |
 | `scripts/smoke_api.py`（端到端 HTTP） | **34 / 34 通过** |
 | SDK CLI 实机联调（login/status/snapshot/case/replay live/analyze） | 通过 |
+| **真实浏览器全流程**（Chromium，登录 + 7 个页面 + 案例下钻 + 触发回放） | 通过，**控制台 0 报错、0 失败请求** |
 | `node --check web/app.js` | 语法通过 |
 
 冒烟测试覆盖：健康检查 → 演示数据初始化 → 登录 → 上报 6 个信号（含 `prod-checkout-db:3306` → `checkout-db` 归一化）→ 建案例（真值自动填充 + 故障类型规范到 `slowSQL`）→ GSTO 四层门禁 → 回放 → 套件回放 → 统计/趋势/故障/拓扑/词表 → BadCase 聚类 → 优化建议（跨 skill / prompt / 别名表三类，带 diff、含关联案例摘要、验证重复分析幂等）→ 审批 → 导出 → 审计 → Token 管理。
