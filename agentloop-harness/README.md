@@ -47,7 +47,7 @@ open http://127.0.0.1:8848
 不想装依赖、只想验证打分逻辑？
 
 ```bash
-./run.sh --selfcheck     # 35 项离线断言，不启动服务
+./run.sh --selfcheck     # 61 项离线断言，不启动服务
 ```
 
 ### 界面一览
@@ -67,6 +67,14 @@ open http://127.0.0.1:8848
 **实体语义** —— 归一化实体拓扑（力导向图）、跨域命名口径对照、故障分类树：
 
 ![实体语义](docs/screenshots/entities.png)
+
+**监控告警** —— 被测 Agent 的健康快照（健康 / 退化 / 静默）+ 10 条确定性规则 + 可编辑阈值：
+
+![监控告警](docs/screenshots/alerts.png)
+
+**使用说明** —— 内置中英双语说明书，覆盖接入 / 测评 / 看数 / 监控 / 优化全流程：
+
+![使用说明](docs/screenshots/docs.png)
 
 ### 接一个自己的 Agent
 
@@ -171,8 +179,10 @@ L4 证据检查点 evidence            →  每条含关键词 / 实体 / 指标
 | 运行记录 | 全量快照列表、筛选、下钻到 span 瀑布图与信号时间线 |
 | 案例库 | 三层状态（黄金 / BadCase / 候选）、质量门禁详情、真值标注、导出 JSON |
 | 回放 | 单案例回放、按状态批量跑套件、历史分数曲线、基线 delta |
+| 监控告警 | Agent 健康快照（健康 / 退化 / 静默）、10 条规则按时间窗评估、阈值可调、告警确认 |
 | 优化建议 | BadCase 聚类结果、建议列表、diff 评审、确认后提交 GitHub |
 | 实体拓扑 | 实体目录 + 邻接关系图（ECharts 力导向） |
+| 使用说明 | 内置中英双语说明书（可切换、可跳转目录） |
 | 设置 | GitHub / 被测 Agent / 阈值配置、连通性验证、API Token 管理、审计日志 |
 
 ## 目录结构
@@ -180,12 +190,13 @@ L4 证据检查点 evidence            →  每条含关键词 / 实体 / 指标
 ```
 agentloop-harness/
 ├── backend/app/
-│   ├── api.py            # 41 个 REST 路由（/api/v1）
-│   ├── store.py          # SQLite 存储层（13 张表）
+│   ├── api.py            # 46 个 REST 路由（/api/v1）
+│   ├── store.py          # SQLite 存储层（14 张表）
 │   ├── ingest.py         # 快照摄入 + 四层真值初稿抽取（框架无关）
 │   ├── scoring.py        # 确定性打分器 + 故障词表 + 归一化 + GSTO 门禁
 │   ├── graph.py          # 实体图与拓扑、BadCase 聚类
 │   ├── replay.py         # 回放引擎（offline/live/snapshot）+ 导出
+│   ├── alerts.py         # 告警规则引擎：10 条确定性规则 + 阈值覆盖 + 确认
 │   ├── optimizer.py      # 4 条规则 → diff 补丁
 │   ├── github_client.py  # GitHub REST：建分支 / 提文件 / 开 PR
 │   ├── security.py       # PBKDF2 口令 + HMAC 会话 + Token
@@ -194,10 +205,10 @@ agentloop-harness/
 │   ├── client.py         # HTTP 客户端
 │   ├── recorder.py       # Harness / RunRecorder 上下文管理器
 │   └── cli.py            # harness login/record/report/snapshot/case/replay/analyze/submit/demo
-├── web/                  # 单页控制台（原生 JS + ECharts，无需构建）
+├── web/                  # 单页控制台（原生 JS + ECharts，无需构建；含中英双语说明书）
 ├── scripts/
-│   ├── selfcheck.py      # 35 项离线自检（不依赖 Web 框架）
-│   └── smoke_api.py      # 29 项端到端 HTTP 冒烟测试
+│   ├── selfcheck.py      # 61 项离线自检（不依赖 Web 框架）
+│   └── smoke_api.py      # 51 项端到端 HTTP 冒烟测试
 ├── examples/
 │   ├── local_agent.py    # 示例：可被 live 回放的本地 Agent 服务
 │   ├── sdk_demo.py       # 示例：用 SDK 上报一次故障排查
@@ -214,14 +225,14 @@ agentloop-harness/
 - **一条命令跑起来**，不需要 Docker、不需要建库建表、不需要 `npm install`。
 - 单文件 SQLite 让你可以把整个平台的数据库**拷走就完成迁移**，也方便把一批 Case 当作 artifact 分发。
 - 前端零构建，改完刷新即生效——评测平台本身的迭代频率很高，构建链路是负担。
-- 打分器是**纯函数**，不依赖 Web 框架，所以 `scripts/selfcheck.py` 能在没有 fastapi 的环境里跑完 35 项断言。
+- 打分器是**纯函数**，不依赖 Web 框架，所以 `scripts/selfcheck.py` 能在没有 fastapi 的环境里跑完 61 项断言。
 
 ## 验证状态
 
 | 测试 | 结果 |
 |---|---|
-| `scripts/selfcheck.py`（离线，零 Web 依赖） | **35 / 35 通过** |
-| `scripts/smoke_api.py`（端到端 HTTP） | **34 / 34 通过** |
+| `scripts/selfcheck.py`（离线，零 Web 依赖） | **61 / 61 通过** |
+| `scripts/smoke_api.py`（端到端 HTTP） | **51 / 51 通过** |
 | SDK CLI 实机联调（login/status/snapshot/case/replay live/analyze） | 通过 |
 | **真实浏览器全流程**（Chromium，登录 + 7 个页面 + 案例下钻 + 触发回放） | 通过，**控制台 0 报错、0 失败请求** |
 | `node --check web/app.js` | 语法通过 |

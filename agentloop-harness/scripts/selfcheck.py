@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(ROOT, "backend"))
 TMP = tempfile.mkdtemp(prefix="harness-selfcheck-")
 os.environ["HARNESS_DB"] = os.path.join(TMP, "harness.db")
 
-from app import graph, optimizer, store  # noqa: E402
+from app import alerts, graph, optimizer, store  # noqa: E402
 from app.replay import export_case, run_replay, run_suite  # noqa: E402
 from app.scoring import (  # noqa: E402
     canonical_fault_type, entity_score, fault_type_score, normalize_entity, quality_gate, score_case,
@@ -157,6 +157,84 @@ def main() -> int:
     case_row = store.dec(store.query_one("SELECT * FROM cases WHERE user_id=? LIMIT 1", (uid,)))
     pkg = export_case(case_row, None)
     check("案例包含四层真值与快照", pkg["ground_truth"]["fault_type"] and pkg["snapshot"]["signal_count"] > 0)
+
+    # ---------------------------------------------------------- 8 监控告警
+    print("== 7. 监控告警（确定性规则引擎）")
+    ev = alerts.evaluate(uid, 24)
+    m = ev["metrics"]
+    check("窗口内指标可算", m["runs"] > 0 and 0 <= m["success_rate"] <= 1, str(m["success_rate"]))
+    check("回放通过率进入指标", "replay_pass_rate" in m and m["replays"] > 0, str(m["replays"]))
+    check("告警规则共 10 条", len(ev["rules"]) == 10, str(len(ev["rules"])))
+    check("演示数据应触发告警（含严重级）", ev["summary"]["critical"] >= 1, str(ev["summary"]))
+    check("告警按严重度排序",
+          [a["severity"] for a in ev["alerts"]]
+          == sorted([a["severity"] for a in ev["alerts"]], key=lambda x: alerts.SEVERITY_RANK[x]))
+    check("每条告警都有中英双语标题与处置建议",
+          all(a["name_zh"] and a["name_en"] and a["hint_zh"] and a["hint_en"] for a in ev["alerts"]))
+    check("告警指向具体证据 refs", any(a["refs"] for a in ev["alerts"]))
+    check("Agent 健康快照覆盖全部 Agent", len(ev["agent_health"]) >= 2)
+    check("静默 Agent 被识别", any(h["silent"] for h in ev["agent_health"]))
+    check("健康状态取值合法",
+          all(h["status"] in ("healthy", "degraded", "silent") for h in ev["agent_health"]))
+
+    # 评估必须确定性：同窗口重跑结果一致
+    ev_again = alerts.evaluate(uid, 24)
+    sig1 = [(x["rule_key"], x["signature"]) for x in ev["alerts"]]
+    sig2 = [(x["rule_key"], x["signature"]) for x in ev_again["alerts"]]
+    check("重复评估结果一致（确定性）", sig1 == sig2, f"{len(sig1)} vs {len(sig2)}")
+
+    # 样本不足要跳过而不是误报。时间戳精度只到秒，切不出「空窗口」，
+    # 所以用一个没有任何数据的 user_id 来验证，顺便覆盖多租户隔离。
+    empty_uid = uid + 100000
+    empty = alerts.evaluate(empty_uid, 24)
+    check("无数据用户不产生业务告警", empty["metrics"]["runs"] == 0 and not empty["agent_health"])
+    check("样本不足时规则被跳过而非误报",
+          empty["skipped_rules"] and not any(
+              a["rule_key"] in ("success_rate_drop", "error_spike", "replay_pass_drop")
+              for a in empty["alerts"]),
+          str([s["rule_key"] for s in empty["skipped_rules"]]))
+    check("无数据时触发 no_data 提示",
+          any(a["rule_key"] == "no_data" for a in empty["alerts"]),
+          str([a["rule_key"] for a in empty["alerts"]]))
+    check("多租户隔离：他人数据不串入", empty["metrics"]["runs"] != m["runs"])
+
+    # 确认 / 取消确认
+    target = next((a for a in ev["alerts"] if a["rule_key"] == "cost_budget"), ev["alerts"][0])
+    alerts.ack(uid, target["rule_key"], target["signature"], "已知悉")
+    ev_acked = alerts.evaluate(uid, 24)
+    same = next(a for a in ev_acked["alerts"] if a["rule_key"] == target["rule_key"])
+    check("确认后该告警标记为已确认", same["acknowledged"] is True)
+    check("确认不影响其他告警",
+          ev_acked["summary"]["open"] == ev["summary"]["open"] - 1,
+          f"{ev_acked['summary']['open']} vs {ev['summary']['open']}")
+    alerts.unack(uid, target["rule_key"])
+    check("取消确认后恢复未确认",
+          not next(a for a in alerts.evaluate(uid, 24)["alerts"]
+                   if a["rule_key"] == target["rule_key"])["acknowledged"])
+
+    # 签名量化：数值微抖动不应重新告警
+    s_ratio = alerts._signature("success_rate", 0.51064, "ratio")
+    check("比率签名按 0.1% 量化（微抖动不重触发）",
+          s_ratio == alerts._signature("success_rate", 0.51061, "ratio"), s_ratio)
+    check("比率签名对真实变化敏感", s_ratio != alerts._signature("success_rate", 0.62, "ratio"))
+
+    # 阈值覆盖
+    rules = alerts.save_rules(uid, {"cost_budget": {"threshold": 999, "severity": "info"}})
+    r = next(x for x in rules if x["key"] == "cost_budget")
+    check("阈值可覆盖并标记来源", r["threshold"] == 999 and r["severity"] == "info" and r["overridden"])
+    check("覆盖后仍保留默认值", r["default_threshold"] == 5.0)
+    check("提高阈值后该规则不再触发",
+          not any(a["rule_key"] == "cost_budget" for a in alerts.evaluate(uid, 24)["alerts"]))
+    check("规则语义字段不可覆盖", "op" not in alerts.OVERRIDABLE and "metric" not in alerts.OVERRIDABLE)
+    alerts.save_rules(uid, {"cost_budget": {"threshold": 5.0, "severity": "warning"}})
+    restored = next(x for x in alerts.effective_rules(uid) if x["key"] == "cost_budget")
+    check("恢复默认值后去掉自定义标记", not restored["overridden"], str(restored))
+
+    # 启停
+    alerts.save_rules(uid, {"no_data": {"enabled": False}})
+    check("规则可停用",
+          not next(x for x in alerts.effective_rules(uid) if x["key"] == "no_data")["enabled"])
+    alerts.save_rules(uid, {"no_data": {"enabled": True}})
 
     print()
     print(f"通过 {len(PASS)} 项，失败 {len(FAIL)} 项")

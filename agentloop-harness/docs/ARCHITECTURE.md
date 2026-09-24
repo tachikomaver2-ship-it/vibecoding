@@ -39,7 +39,7 @@ backend/app/
 └── seed.py           ← 演示数据
 ```
 
-**为什么要把 `ingest` 从 `api` 里抽出来？** 因为初期 `ingest` 逻辑写在 `api.py` 里，导致 `scripts/selfcheck.py` 必须先把 fastapi 装好才能跑。抽出来后，自检脚本只 import `store / scoring / ingest / seed / replay / optimizer`，**在零 Web 依赖的环境里也能跑完 35 项断言**——打分器的正确性不该被 Web 框架绑架。
+**为什么要把 `ingest` 从 `api` 里抽出来？** 因为初期 `ingest` 逻辑写在 `api.py` 里，导致 `scripts/selfcheck.py` 必须先把 fastapi 装好才能跑。抽出来后，自检脚本只 import `store / scoring / ingest / seed / replay / optimizer`，**在零 Web 依赖的环境里也能跑完 61 项断言**——打分器的正确性不该被 Web 框架绑架。
 
 分层纪律：
 
@@ -47,7 +47,7 @@ backend/app/
 - `scoring.py` **不允许**有 IO，是纯函数集合（这也是它能被离线穷举测试的前提）。
 - `replay.py` 是唯一会发外部 HTTP 请求的领域模块（live 回放）。
 
-## 三、数据模型（13 张表）
+## 三、数据模型（14 张表）
 
 ### 快照层 —— 原样存下来
 

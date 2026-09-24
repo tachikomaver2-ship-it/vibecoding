@@ -381,7 +381,101 @@ curl -sX POST http://127.0.0.1:8848/api/v1/tokens \
 
 ---
 
-## 六、统计与查询
+## 六、监控与告警接口
+
+监控的对象是**被测 Agent 这个系统本身**（它最近健不健康），不是案例的作答质量（那叫测评）。评估完全确定性：同一份数据、同一个窗口，任何时候结果一致，可直接用于 CI 门禁。
+
+### `GET /api/v1/alerts?window_hours=24`
+
+评估全部规则。`window_hours` 支持 `(0, 2160]`（90 天）。
+
+```json
+{
+  "evaluated_at": "2026-09-24T16:05:00",
+  "window_hours": 24,
+  "since": "2026-09-23T16:05:00",
+  "summary": { "critical": 2, "warning": 5, "info": 1, "total": 8, "open": 8, "acknowledged": 0 },
+  "metrics": {
+    "runs": 94, "success_rate": 0.5106, "error_rate": 0.383,
+    "p95_duration_ms": 640000, "max_tool_calls": 33, "max_tokens_out": 161100,
+    "cost_usd": 20.672, "replays": 10, "replay_pass_rate": 0.6,
+    "new_badcase": 2, "silent_agents": 1
+  },
+  "alerts": [
+    {
+      "rule_key": "success_rate_drop", "severity": "critical",
+      "metric": "success_rate", "unit": "ratio", "op": "lt",
+      "current": 0.5106, "threshold": 0.6,
+      "current_text": "51.1%", "threshold_text": "60.0%",
+      "compare_zh": "低于", "compare_en": "below",
+      "name_zh": "成功率跌破下限", "name_en": "Success rate below floor",
+      "desc_zh": "…", "desc_en": "…", "hint_zh": "…", "hint_en": "…",
+      "sample": 94,
+      "refs": [ { "id": 31, "external_run_id": "run-20260924-01", "status": "failed" } ],
+      "signature": "success_rate=0.511",
+      "acknowledged": false, "overridden": false, "default_threshold": 0.6
+    }
+  ],
+  "skipped_rules": [
+    { "rule_key": "replay_pass_drop", "reason": "insufficient_samples", "sample": 0, "min_samples": 2 }
+  ],
+  "agent_health": [
+    { "agent": "ops-agent", "status": "degraded", "runs_in_window": 94, "total_runs": 94,
+      "success_rate": 0.5106, "avg_duration_ms": 320851, "max_tool_calls": 33,
+      "cost_usd": 20.672, "last_seen": "2026-09-24T15:40:00", "silent": false }
+  ],
+  "rules": [ { "key": "cost_budget", "threshold": 5.0, "default_threshold": 5.0,
+               "severity": "warning", "enabled": true, "overridden": false, "…": "…" } ]
+}
+```
+
+要点：
+
+- **refs** 指向具体运行或具体案例，可直接下钻，不给孤零零一个数字。
+- **signature** 是「规则 + 量化后的指标值」。确认时按它记录，指标一变就重新告警；量化精度按量纲取（比率 0.1%、金额到分、耗时到秒），避免数值微抖动反复打扰。
+- **skipped_rules** 让你看见「样本不足被跳过」的规则——是跳过，不是通过。
+- **agent_health** 的状态机：窗口内有上报且成功率 ≥ 0.6 → `healthy`；有上报但成功率 < 0.6 → `degraded`；一条都没有 → `silent`。
+
+### `GET /api/v1/alerts/rules` / `PUT /api/v1/alerts/rules`
+
+读取与覆盖规则。**只有 `enabled` / `threshold` / `severity` 三个字段可覆盖**，规则语义（指标、比较符）不可改，避免出现无法解释的状态。
+
+```json
+PUT /api/v1/alerts/rules
+{ "rules": { "cost_budget": { "threshold": 20, "severity": "info" } } }
+```
+
+把 `threshold` 设回默认值会自动清掉覆盖标记；`enabled: false` 停用规则。每次改动写审计日志。
+
+### `POST /api/v1/alerts/{rule_key}/ack` / `DELETE /api/v1/alerts/{rule_key}/ack`
+
+```json
+POST /api/v1/alerts/cost_budget/ack
+{ "signature": "cost_usd=20.67", "note": "已知悉，压测导致" }
+```
+
+`signature` 必填——防止把「已经变化了的告警」误确认掉。`DELETE` 会清掉该规则的全部确认记录。
+
+### 内置 10 条规则
+
+| 规则 | 指标 | 触发 | 默认阈值 | 严重度 | 样本下限 |
+|---|---|---|---|---|---|
+| `success_rate_drop` | `success_rate` | 低于 | 60% | critical | 3 |
+| `error_spike` | `error_rate` | 高于 | 30% | critical | 3 |
+| `replay_pass_drop` | `replay_pass_rate` | 低于 | 60% | critical | 2 |
+| `latency_spike` | `p95_duration_ms` | 高于 | 600s | warning | 3 |
+| `tool_call_runaway` | `max_tool_calls` | 不低于 | 20 | warning | 1 |
+| `token_runaway` | `max_tokens_out` | 不低于 | 100,000 | warning | 1 |
+| `cost_budget` | `cost_usd` | 高于 | $5.00 | warning | 1 |
+| `new_badcase` | `new_badcase` | 不低于 | 1 | warning | 1 |
+| `agent_silent` | `silent_agents` | 不低于 | 1 | info | 1 |
+| `no_data` | `runs` | 低于 | 1 | info | 0 |
+
+> 注意：告警只在**打开页面或调用接口时**计算，没有后台常驻调度器，暂无邮件 / IM 推送。接 CI 请定时拉 `GET /alerts` 并按 `summary.open` 判断。
+
+---
+
+## 七、统计与查询
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -401,7 +495,7 @@ curl -sX POST http://127.0.0.1:8848/api/v1/tokens \
 
 ---
 
-## 七、设置接口
+## 八、设置接口
 
 ### `GET /api/v1/settings`
 
@@ -436,7 +530,7 @@ curl -sX POST http://127.0.0.1:8848/api/v1/tokens \
 
 ---
 
-## 八、Python SDK
+## 九、Python SDK
 
 ```bash
 pip install -e ./sdk      # 零第三方依赖
@@ -501,7 +595,7 @@ print(h.stats())
 
 ---
 
-## 九、命令行
+## 十、命令行
 
 ```bash
 harness login    --endpoint http://127.0.0.1:8848 --token hnx_xxx

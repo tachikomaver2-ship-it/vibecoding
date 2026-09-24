@@ -29,7 +29,7 @@ cd vibecoding/agentloop-harness
 ```bash
 ./run.sh                  # 只启动
 ./run.sh --seed           # 先写演示数据再启动
-./run.sh --selfcheck      # 只跑 35 项离线自检，不启动服务
+./run.sh --selfcheck      # 只跑 61 项离线自检，不启动服务
 PORT=9000 ./run.sh        # 换端口
 HOST=0.0.0.0 ./run.sh     # 允许外部访问（见下方安全提醒）
 VENV=/tmp/v ./run.sh      # 换虚拟环境位置

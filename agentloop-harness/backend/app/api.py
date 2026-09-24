@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import os
 
-from . import github_client, graph, optimizer, replay as replay_mod, security, store
+from . import alerts, github_client, graph, optimizer, replay as replay_mod, security, store
 from .ingest import auto_fill_from_run as _auto_fill_from_run, ingest_run
 from .scoring import (
     FAULT_GROUPS, canonical_fault_type, fault_group_of, normalize_entity, quality_gate,
@@ -766,6 +766,61 @@ def submit_optimization(oid: int, payload: dict = Body(default={}), user: dict =
 def audit_log(user: dict = Depends(current_user), limit: int = Query(100, le=500)) -> list[dict]:
     return store.dec_many(store.query(
         "SELECT * FROM audit_log WHERE user_id=? ORDER BY id DESC LIMIT ?", (user["id"], limit)))
+
+
+# ------------------------------------------------------------------ 监控与告警
+
+@api.get("/alerts")
+def list_alerts(user: dict = Depends(current_user),
+                window_hours: float = Query(24.0, gt=0, le=24 * 90)) -> dict:
+    """按时间窗评估全部告警规则。
+
+    完全确定性：同一份数据、同一个窗口，任何时候结果一致，可放进 CI 做门禁。
+    """
+    return alerts.evaluate(user["id"], window_hours)
+
+
+@api.get("/alerts/rules")
+def list_alert_rules(user: dict = Depends(current_user)) -> dict:
+    return {
+        "rules": alerts.effective_rules(user["id"]),
+        "overridable": list(alerts.OVERRIDABLE),
+        "severities": list(alerts.SEVERITY_RANK.keys()),
+    }
+
+
+@api.put("/alerts/rules")
+def update_alert_rules(payload: dict = Body(...), user: dict = Depends(current_user)) -> dict:
+    """覆盖阈值 / 严重度 / 启停。只允许改可覆盖字段，规则语义不可改。"""
+    patch = payload.get("rules") if isinstance(payload.get("rules"), dict) else payload
+    try:
+        rules = alerts.save_rules(user["id"], patch or {})
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    store.audit(user["id"], "alert.rules.update", ",".join(sorted((patch or {}).keys())), patch)
+    return {"rules": rules}
+
+
+@api.post("/alerts/{rule_key}/ack")
+def ack_alert(rule_key: str, payload: dict = Body(default={}),
+              user: dict = Depends(current_user)) -> dict:
+    """确认告警。按「规则 + 指标快照」记录，指标一变就会重新触发。"""
+    signature = (payload.get("signature") or "").strip()
+    if not signature:
+        raise HTTPException(400, "缺少 signature，无法确认（避免误确认到已变化的告警）")
+    try:
+        result = alerts.ack(user["id"], rule_key, signature, (payload.get("note") or "").strip())
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    store.audit(user["id"], "alert.ack", rule_key, {"signature": signature})
+    return result
+
+
+@api.delete("/alerts/{rule_key}/ack")
+def unack_alert(rule_key: str, user: dict = Depends(current_user)) -> dict:
+    removed = alerts.unack(user["id"], rule_key)
+    store.audit(user["id"], "alert.unack", rule_key, {"removed": removed})
+    return {"rule_key": rule_key, "removed": removed}
 
 
 @api.get("/health")

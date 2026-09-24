@@ -22,7 +22,12 @@ TOKEN = ""
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
-def call(path: str, method: str = "GET", body: dict | None = None):
+def call(path: str, method: str = "GET", body: dict | None = None, expect_error: bool = False):
+    """调用接口。
+
+    expect_error=True 时把 4xx/5xx 的响应体当作返回值，用于断言「非法输入会被拒绝」，
+    此时若真的成功返回会抛 AssertionError——否则这类测试会因为写错而静默通过。
+    """
     url = BASE + path
     data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
@@ -33,7 +38,12 @@ def call(path: str, method: str = "GET", body: dict | None = None):
         with _OPENER.open(req, timeout=60) as resp:
             raw = resp.read().decode()
     except urllib.error.HTTPError as exc:
-        raise AssertionError(f"{method} {path} → HTTP {exc.code}: {exc.read().decode()[:300]}") from exc
+        detail = exc.read().decode()[:300]
+        if expect_error:
+            return {"_status": exc.code, "_detail": detail}
+        raise AssertionError(f"{method} {path} → HTTP {exc.code}: {detail}") from exc
+    if expect_error:
+        raise AssertionError(f"{method} {path} 预期失败但返回了成功：{raw[:200]}")
     return json.loads(raw) if raw else None
 
 
@@ -163,6 +173,53 @@ def main() -> int:
     check("案例包可导出（含四层真值）", pkg["schema"].endswith("case@1") and bool(pkg["ground_truth"]["fault_type"]))
     check("审计日志已记录", len(call("/audit?limit=20")) > 0)
     check("API Token 可管理", len(call("/tokens")) >= 1)
+
+    print("== 9. 监控与告警")
+    ev = call("/alerts?window_hours=24")
+    check("告警评估返回指标与规则", bool(ev["metrics"]) and len(ev["rules"]) == 10)
+    check("演示数据触发告警", ev["summary"]["total"] >= 1, str(ev["summary"]))
+    check("返回 Agent 健康快照", len(ev["agent_health"]) >= 1)
+    check("告警带双语标题与处置建议",
+          all(a["name_zh"] and a["name_en"] and a["hint_zh"] and a["hint_en"] for a in ev["alerts"]))
+    check("告警指向具体证据", any(a["refs"] for a in ev["alerts"]))
+    check("按严重度排序",
+          [a["severity"] for a in ev["alerts"]]
+          == sorted([a["severity"] for a in ev["alerts"]],
+                    key=lambda x: {"critical": 0, "warning": 1, "info": 2}[x]))
+
+    short = call("/alerts?window_hours=1")
+    check("窗口可切换", short["window_hours"] == 1)
+
+    # 规则读取与覆盖
+    rules = call("/alerts/rules")["rules"]
+    cb = next(r for r in rules if r["key"] == "cost_budget")
+    check("规则可读且带默认值", cb["default_threshold"] == 5.0 and not cb["overridden"])
+    upd = call("/alerts/rules", "PUT", {"rules": {"cost_budget": {"threshold": 1e9}}})["rules"]
+    cb2 = next(r for r in upd if r["key"] == "cost_budget")
+    check("阈值可覆盖", cb2["threshold"] == 1e9 and cb2["overridden"])
+    ev2 = call("/alerts?window_hours=24")
+    check("阈值提高后该规则静默", not any(a["rule_key"] == "cost_budget" for a in ev2["alerts"]))
+    call("/alerts/rules", "PUT", {"rules": {"cost_budget": {"threshold": 5.0}}})
+    check("恢复默认后标记清除",
+          not next(r for r in call("/alerts/rules")["rules"] if r["key"] == "cost_budget")["overridden"])
+
+    # 确认 / 取消确认
+    ev3 = call("/alerts?window_hours=24")
+    check("恢复默认后告警重新出现", ev3["summary"]["total"] >= 1)
+    tgt = ev3["alerts"][0]
+    call(f"/alerts/{tgt['rule_key']}/ack", "POST", {"signature": tgt["signature"]})
+    ev4 = call("/alerts?window_hours=24")
+    same = next(a for a in ev4["alerts"] if a["rule_key"] == tgt["rule_key"])
+    check("告警可确认", same["acknowledged"] is True)
+    check("未确认数相应减少", ev4["summary"]["open"] == ev3["summary"]["open"] - 1)
+    missing = call("/alerts/no_such_rule/ack", "POST", {"signature": "x"}, expect_error=True)
+    check("未知规则确认被拒", "未知规则" in str(missing), str(missing)[:80])
+    no_sig = call(f"/alerts/{tgt['rule_key']}/ack", "POST", {}, expect_error=True)
+    check("缺 signature 的确认被拒（防误确认）", "signature" in str(no_sig), str(no_sig)[:80])
+    call(f"/alerts/{tgt['rule_key']}/ack", "DELETE")
+    ev5 = call("/alerts?window_hours=24")
+    check("取消确认后恢复未确认",
+          not next(a for a in ev5["alerts"] if a["rule_key"] == tgt["rule_key"])["acknowledged"])
 
     print()
     print(f"通过 {len(PASS)} 项，失败 {len(FAIL)} 项")

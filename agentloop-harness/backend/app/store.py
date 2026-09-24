@@ -192,11 +192,22 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS alert_acks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  rule_key TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  note TEXT DEFAULT '',
+  acked_at TEXT NOT NULL,
+  UNIQUE (user_id, rule_key, signature)
+);
+
 CREATE INDEX IF NOT EXISTS idx_runs_user ON runs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_spans_run ON spans(run_id);
 CREATE INDEX IF NOT EXISTS idx_signals_run ON signals(run_id, modality);
 CREATE INDEX IF NOT EXISTS idx_cases_user ON cases(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_case_runs_case ON case_runs(case_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alert_acks_user ON alert_acks(user_id, rule_key);
 """
 
 
